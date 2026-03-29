@@ -38,6 +38,12 @@ interface CareerReport {
         interview_readiness: number;
         overall_capability: number;
     };
+    live_job_demand?: {
+        signal_count: number;
+        demand_level: string;
+        key_hiring_companies: string[];
+        recent_trend: string;
+    };
     historical_market?: {
         trend_line: { year: string; count: number }[];
         top_historical_companies: { name: string; count: number }[];
@@ -363,7 +369,7 @@ export const CareerPathfinder = () => {
                                             <div style={{ marginTop: '0.5rem' }}>
                                                 <p style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>ACTIVE HIRING AT:</p>
                                                 <div className="flex flex-wrap gap-xs">
-                                                    {report.live_job_demand.key_hiring_companies.map(c => (
+                                                    {report.live_job_demand.key_hiring_companies.map((c: string) => (
                                                         <span key={c} className="badge" style={{ background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }}>{c}</span>
                                                     ))}
                                                 </div>
