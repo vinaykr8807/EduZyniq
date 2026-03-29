@@ -522,15 +522,51 @@ def _build_roadmap(role: str, missing_skills: List[str], market_skills: List[str
     }
 
 
+def _extract_deep_resume_insights(text: str, role: str) -> List[str]:
+    """Uses LLM to perform deep analysis of resume text, extracting skills from project descriptions and experience sections."""
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key or not text:
+        return _extract_skills_from_text(text)
+        
+    client = Groq(api_key=groq_key)
+    prompt = f"""
+    Analyze the following resume text specifically for a candidate targeting a '{role}' position.
+    Extract a comprehensive list of technical skills, frameworks, and methodologies mentioned or STRONGLY implied by their projects and experience.
+    
+    Resume Text: "{text[:4000]}"
+    
+    Output ONLY a JSON array of skill strings like ["React", "FastAPI", "Docker", "System Design"].
+    Focus on high-value skills relevant to the target role.
+    """
+    
+    try:
+        res = client.chat.completions.create(
+            messages=[{"role": "system", "content": "You are a senior technical recruiter."}, {"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            response_format={"type": "json_object"}
+        )
+        data = json.loads(res.choices[0].message.content)
+        # Handle different potential JSON structures from LLM
+        if isinstance(data, list): return data
+        if isinstance(data, dict):
+            for k in data:
+                if isinstance(data[k], list): return data[k]
+        return _extract_skills_from_text(text)
+    except Exception as e:
+        print(f"Deep resume analysis failed: {e}")
+        return _extract_skills_from_text(text)
+
+
 def generate_career_report(resume_text: str, role: str, level: str, city: str, user_email: Optional[str] = None) -> Dict:
     from services.historical_market_data import historical_service, risk_service
     from main import supabase 
     
     normalized_role = role if role in ROLE_SKILLS else "Fullstack Developer"
-    # Extract skills from resume
-    resume_skills_found = _extract_skills_from_text(resume_text)
+    # 1. Deep LLM-based Resume Analysis instead of simple keyword mapping
+    print(f"🚀 Performing deep resume analysis for {normalized_role}...")
+    resume_skills_found = _extract_deep_resume_insights(resume_text, normalized_role)
     
-    # 1. Fetch performance stats for capability score
+    # 2. Fetch performance stats for capability score
     quiz_score: float = 0.0
     interview_score: int = 0
     if user_email:
