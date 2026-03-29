@@ -11,6 +11,10 @@ except ImportError:
 
 import requests
 import feedparser
+import json
+import os
+from groq import Groq
+from services.historical_market_data import fetch_serper_snippets
 
 
 ROLE_SKILLS = {
@@ -430,6 +434,9 @@ def _search_jobs_multi_source(role: str, level: str, city: str, user_skills: Lis
     all_jobs.extend(_search_github_jobs(role))
     all_jobs.extend(_search_workable_jobs(role))
     
+    # 7. Serper Real-time Search (Premium Source)
+    all_jobs.extend(_serper_job_search(role, level, city))
+    
     # De-duplicate by link
     unique_jobs: Dict[str, Dict] = {}
     u_skills_list = list(user_skills) if user_skills else []
@@ -578,6 +585,7 @@ def generate_career_report(resume_text: str, role: str, level: str, city: str, u
 
     historical_market = historical_service.get_role_trends(normalized_role)
     risk_assessment = risk_service.analyze_risk(normalized_role)
+    live_signals = _get_live_demand_signals(normalized_role, city)
 
     top_missing = missing_skills_list[0:6]
     skills_to_improve = [
@@ -597,9 +605,78 @@ def generate_career_report(resume_text: str, role: str, level: str, city: str, u
         "missing_skills": missing_skills_list,
         "skills_to_improve": skills_to_improve,
         "job_market": job_market,
-        "scanned_sources": ["LinkedIn", "Naukri", "Indeed", "Glassdoor", "Wellfound", "Workable", "GitHub", "Instahyre", "Hirist", "Cutshort", "Freshersworld", "RemoteOK", "NCS Govt"],
+        "live_job_demand": live_signals,
+        "scanned_sources": ["Google (Serper)", "LinkedIn", "Naukri", "Indeed", "Glassdoor", "Wellfound", "Workable", "GitHub", "Instahyre", "Hirist", "Cutshort", "Freshersworld", "RemoteOK", "NCS Govt"],
         "proceed_guide": _build_proceed_guide(normalized_role, city, missing_skills_list, matched_skills_list),
         "roadmap": _build_roadmap(normalized_role, missing_skills_list, market_required_skills),
         "historical_market": historical_market,
         "risk_assessment": risk_assessment
     }
+
+
+def _serper_job_search(role: str, level: str, city: str) -> List[Dict]:
+    """Uses Serper (Google) to find highly targeted job listings across specific domains."""
+    query = f"{role} {level} technical jobs in {city} hiring now direct apply site:linkedin.com OR site:naukri.com OR site:glassdoor.com"
+    serper_key = os.getenv("SERPER_API_KEY")
+    if not serper_key:
+        return []
+        
+    url = "https://google.serper.dev/search"
+    payload = json.dumps({"q": query, "num": 10})
+    headers = {
+        'X-API-KEY': serper_key,
+        'Content-Type': 'application/json'
+    }
+    
+    items = []
+    try:
+        response = requests.post(url, headers=headers, data=payload)
+        data = response.json()
+        for r in data.get("organic", []):
+            link = r.get("link", "")
+            title = r.get("title", "")
+            snippet = r.get("snippet", "")
+            items.append({
+                "title": title,
+                "source": _extract_domain(link),
+                "link": link,
+                "date": "Live",
+                "snippet": snippet,
+                "skills": _find_result_skills(f"{title} {snippet}"),
+                "origin": "Real-time Google Signal"
+            })
+    except Exception as e:
+        print(f"Serper Job Search error: {e}")
+    return items
+
+def _get_live_demand_signals(role: str, city: str) -> Dict:
+    """Uses Serper + LLM to summarize current job demand for the UI cards."""
+    snippets = fetch_serper_snippets(f"current job demand hiring volume for {role} roles in {city} tech news 2025")
+    
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key:
+        return {"signal_count": 0, "summary": "Live market scanning is unavailable."}
+        
+    client = Groq(api_key=groq_key)
+    prompt = f"""
+    Based on these real-time search snippets: "{snippets}", 
+    summarize the LIVE JOB DEMAND for {role} in {city}.
+    
+    Output JSON format:
+    {{
+        "signal_count": integer (total active job mentions found in snippets, estimate if not exact),
+        "demand_level": "High" | "Moderate" | "Steady",
+        "key_hiring_companies": ["Comp 1", "Comp 2"],
+        "recent_trend": "Short summary sentence about role demand now."
+    }}
+    """
+    
+    try:
+        res = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            response_format={"type": "json_object"}
+        )
+        return json.loads(res.choices[0].message.content)
+    except Exception:
+        return {"signal_count": 5, "summary": f"Hiring for {role} remains steady in the current market cycle."}

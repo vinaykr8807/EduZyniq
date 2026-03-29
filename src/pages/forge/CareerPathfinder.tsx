@@ -342,22 +342,55 @@ export const CareerPathfinder = () => {
                                 </div>
                             )}
 
+                            {report.live_job_demand && (
+                                <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid var(--primary-500)', background: 'linear-gradient(135deg, rgba(16,185,129,0.05) 0%, rgba(0,0,0,0) 100%)' }}>
+                                    <h3 style={{ fontSize: '1rem', color: 'var(--primary-400)', marginBottom: '1rem' }}>📡 Real-time Market Signals</h3>
+                                    <div className="grid grid-cols-2 gap-md" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.2rem' }}>
+                                        <div className="flex-col" style={{ padding: '1rem', background: 'var(--glass-border)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Current Demand</span>
+                                            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent-teal)' }}>{report.live_job_demand.demand_level}</span>
+                                        </div>
+                                        <div className="flex-col" style={{ padding: '1rem', background: 'var(--glass-border)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Found</span>
+                                            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent-blue)' }}>{report.live_job_demand.signal_count}+</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex-col gap-sm">
+                                        <p style={{ fontSize: '0.82rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                                            <strong>Key Insight:</strong> {report.live_job_demand.recent_trend}
+                                        </p>
+                                        {report.live_job_demand.key_hiring_companies.length > 0 && (
+                                            <div style={{ marginTop: '0.5rem' }}>
+                                                <p style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>ACTIVE HIRING AT:</p>
+                                                <div className="flex flex-wrap gap-xs">
+                                                    {report.live_job_demand.key_hiring_companies.map(c => (
+                                                        <span key={c} className="badge" style={{ background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }}>{c}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {report.historical_market && report.historical_market.total_historical_records > 0 && (
                                 <div className="glass-card" style={{ padding: '1.5rem' }}>
                                     <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem' }}>📜 Long-Term Market Stability (2021-2025)</h3>
                                     <div className="flex gap-md" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: '100px', background: 'rgba(52,160,90,0.02)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
                                         {report.historical_market.trend_line.map((item, i) => {
-                                            const max = Math.max(...report.historical_market!.trend_line.map(t => t.count), 1);
+                                            const trendVals = report.historical_market?.trend_line.map(t => t.count) || [1];
+                                            const max = Math.max(...trendVals, 1);
                                             const h = (item.count / max) * 100;
+                                            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
                                             return (
                                                 <div key={item.year} className="flex-col items-center gap-xs" style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-                                                    <div 
+                                                    <div className="bar-glow"
                                                         style={{ 
-                                                            width: '100%', 
-                                                            height: `${h}%`, 
-                                                            background: i === 4 ? 'var(--accent-teal)' : 'rgba(20,184,166,0.3)', 
-                                                            borderRadius: '4px 4px 0 0', 
-                                                            minHeight: item.count > 0 ? '4px' : '0',
+                                                            width: '80%', 
+                                                            height: `${Math.max(h, 4)}%`, 
+                                                            background: colors[i % colors.length], 
+                                                            borderRadius: '6px 6px 0 0', 
+                                                            opacity: 0.8,
                                                             transition: 'height 1.2s ease-out'
                                                         }} 
                                                     />
@@ -381,27 +414,28 @@ export const CareerPathfinder = () => {
                                             href={job.link}
                                             target="_blank"
                                             rel="noreferrer"
-                                            style={{ display: 'block', border: '1px solid var(--glass-border)', borderRadius: '10px', padding: '0.9rem', textDecoration: 'none', position: 'relative', overflow: 'hidden' }}
+                                            style={{ display: 'block', border: '1px solid var(--glass-border)', borderRadius: '10px', padding: '0.9rem', textDecoration: 'none', position: 'relative', overflow: 'hidden', background: 'rgba(255,255,255,0.02)' }}
+                                            className="job-link-hover"
                                         >
                                             <div className="flex justify-between items-start">
                                                 <div style={{ flex: 1 }}>
                                                     <p style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', wordBreak: 'break-word' }}>{job.title}</p>
                                                     <div className="flex gap-xs items-center" style={{ marginTop: '0.2rem' }}>
                                                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{job.source}</span>
-                                                        {job.origin && <span className="badge" style={{ fontSize: '0.6rem', padding: '2px 6px', background: 'var(--glass-border)' }}>{job.origin}</span>}
+                                                        {job.origin && <span className="badge" style={{ fontSize: '0.6rem', padding: '2px 6px', background: 'var(--glass-border)', color: 'var(--primary-300)' }}>{job.origin}</span>}
                                                     </div>
                                                 </div>
                                                 {job.suitability_score !== undefined && (
-                                                    <div style={{ textAlign: 'right' }}>
+                                                    <div style={{ textAlign: 'right', minWidth: '60px' }}>
                                                         <span style={{ fontSize: '0.9rem', fontWeight: 900, color: job.suitability_score > 70 ? 'var(--accent-teal)' : 'var(--accent-blue)' }}>{job.suitability_score}%</span>
-                                                        <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', opacity: 0.6 }}>Match</p>
+                                                        <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', opacity: 0.6, fontWeight: 700 }}>Match</p>
                                                     </div>
                                                 )}
                                             </div>
                                             <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.5rem', wordBreak: 'break-word', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{job.snippet}</p>
                                             <div className="flex flex-wrap gap-xs" style={{ marginTop: '0.55rem' }}>
                                                 {job.skills.slice(0, 8).map((s) => (
-                                                    <span key={s} className="badge" style={{ fontSize: '0.66rem', padding: '0.2rem 0.5rem' }}>{s}</span>
+                                                    <span key={s} className="badge" style={{ fontSize: '0.66rem', padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.03)' }}>{s}</span>
                                                 ))}
                                             </div>
                                         </a>
@@ -422,6 +456,15 @@ export const CareerPathfinder = () => {
                     .career-grid {
                         grid-template-columns: 1fr !important;
                     }
+                }
+                .bar-glow {
+                    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+                }
+                .job-link-hover:hover {
+                    border-color: var(--primary-500) !important;
+                    background: rgba(100,130,255,0.05) !important;
+                    transform: translateY(-2px);
+                    transition: all 0.2s ease;
                 }
             `}</style>
         </div>

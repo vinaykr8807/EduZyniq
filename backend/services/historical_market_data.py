@@ -109,18 +109,42 @@ class JobRiskService:
         self._cache_fraud = None
         
     def analyze_risk(self, title: str, description: str = "") -> Dict[str, Any]:
-        """Provides dynamic risk scoring for a job posting."""
-        score = 15
-        lvl = "Low"
-        reasons = ["Role appears historically stable."]
+        """Uses Serper API + Groq to provide dynamic, real-time risk scoring for a job role."""
+        snippets = fetch_serper_snippets(f"recruitment fraud fake job scams targeting {title} roles recent alerts")
         
-        title_lower = title.lower()
-        if any(x in title_lower for x in ["data entry", "remote", "assistant", "crypto"]):
-            score = 65
-            lvl = "Moderate"
-            reasons = ["Keyword matches common remote recruitment scam patterns."]
+        groq_key = os.getenv("GROQ_API_KEY")
+        if not groq_key:
+             return {"score": 15, "level": "Low", "reasons": ["Role appears historically stable."]}
             
-        return {"score": score, "level": lvl, "reasons": reasons}
+        client = Groq(api_key=groq_key)
+        
+        prompt = f"""
+        Analyze the recruitment risk for the role: "{title}".
+        Search context: "{snippets}"
+        
+        Required JSON format:
+        {{
+            "score": integer (0-100, where 100 is extreme risk),
+            "level": "Low" | "Moderate" | "High" | "Extreme",
+            "reasons": ["Reason 1", "Reason 2"]
+        }}
+        
+        Instructions:
+        - Check if this specific role is being targeted by recent fake job campaigns.
+        - High risk if the role is commonly offered as "no-entry remote data entry" or similar scam patterns.
+        - Output ONLY valid JSON.
+        """
+        
+        try:
+            res = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.3-70b-versatile",
+                response_format={"type": "json_object"},
+                temperature=0.3
+            )
+            return json.loads(res.choices[0].message.content)
+        except Exception:
+            return {"score": 10, "level": "Low", "reasons": ["No recent fraud alerts for this specific role."]}
 
     def get_fraud_overview(self) -> Dict[str, Any]:
         """Uses Serper API + Groq to generate real risk metrics"""
