@@ -65,7 +65,11 @@ def generate_dynamic_quiz(subject: str, topic: str, difficulty: str, mode: str =
     - Set "answer" to a string representing the correct full mapping for internal grading logic, but the UI will handle the actual interaction.
     
     Return ONLY a valid JSON object.
-    If the mode is 'visual' or 'image_based', provide a 'visual_query' string in each question object for Pexels image search (e.g. "server room", "code screen", "data center"). DO NOT use abstract or academic terms like "distributed system core" as it fetches biological/anatomical images. Keep the keyword broad and 1-2 words.
+    For 'visual_query': 
+    - provide a 2-4 word string describing a TECHNICAL SCHEMATIC or ARCHITECTURAL layout relevant to the question.
+    - Examples: "CPU internal architecture", "Database indexing B-Tree diagram", "REST API request-response flow", "Cloud infrastructure network schematic".
+    - Avoid generic words like "computer", "brain", "server building".
+    - Focus on finding INTERNAL diagrams.
     """
     
     try:
