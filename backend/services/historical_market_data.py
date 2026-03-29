@@ -32,9 +32,9 @@ class HistoricalMarketData:
     def __init__(self):
         self._cache_overview = None
     
-    def get_role_trends(self, role: str) -> Dict[str, Any]:
-        """Uses Serper API + Groq to generate real-time trend analysis for a specific role."""
-        snippets = fetch_serper_snippets(f"{role} job market hiring trends past decade statistics hiring volume growth global data")
+    def get_role_trends(self, role: str, domain: str = "IT") -> Dict[str, Any]:
+        """Uses Serper API + Groq to generate real-time trend analysis for a specific role and domain."""
+        snippets = fetch_serper_snippets(f"{role} in {domain} job market hiring trends past decade statistics hiring volume growth global data")
         
         groq_key = os.getenv("GROQ_API_KEY")
         if not groq_key:
