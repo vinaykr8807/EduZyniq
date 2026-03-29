@@ -225,9 +225,9 @@ def analyze_resume_deep(text: str, role: str, level: str):
     except:
         search_tags = f"{role}, {level} skills"
 
-    # STAGE 2: Targeted Market Research
-    search_query = f"site:glassdoor.com OR site:linkedin.com {search_tags} in-demand skills job requirements 2026"
-    market_data = get_market_trends(search_query)
+    # STAGE 2: Targeted Market & Interview Research
+    search_query = f"site:glassdoor.com OR site:linkedin.com OR site:levels.fyi {search_tags} technical interview questions architecture topics job requirements 2026"
+    market_data = get_market_trends(search_query, max_results=8) # Higher search volume
 
     # STAGE 3: Final Analysis & Super-Detailed Roadmap
     prompt = f"""
