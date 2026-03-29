@@ -3,23 +3,18 @@ import json
 from typing import Optional
 from groq import Groq
 import requests
+from services.wikipedia_service import get_wikipedia_image
 
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
 
 def get_image(query, page=1):
-    if not PEXELS_API_KEY:
-        return None
-    url = "https://api.pexels.com/v1/search"
-    headers = {"Authorization": PEXELS_API_KEY}
-    params = {"query": query, "per_page": 1, "page": page}
+    """Fetches high-quality technical images, prioritizing Wikipedia diagrams with Pexels fallback."""
     try:
-        r = requests.get(url, headers=headers, params=params)
-        data = r.json()
-        if data.get("photos"):
-            return data["photos"][0]["src"]["large"]
-    except:
-        pass
-    return None
+        # get_wikipedia_image already handles Pexels fallback internally
+        return get_wikipedia_image(query)
+    except Exception as e:
+        print(f"Image Fetch Error: {e}")
+        return None
 
 def generate_dynamic_quiz(subject: str, topic: str, difficulty: str, mode: str = "standard", domain: Optional[str] = None, subtopic: Optional[str] = None):
     api_key = os.getenv("GROQ_API_KEY")
