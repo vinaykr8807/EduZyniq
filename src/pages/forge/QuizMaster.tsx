@@ -151,9 +151,9 @@ export const QuizMaster = ({ onComplete }: any) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_email: user.email,
-                    topic: viewMode === 'curriculum' ? selectedRoadmap?.phases[selectedPhaseIdx].milestones[selectedMilestoneIdx].title : config.topic,
-                    explanation: explanationText,
-                    subject: viewMode === 'curriculum' ? selectedRoadmap?.title : config.subject
+                topic: viewMode === 'curriculum' ? selectedRoadmap?.phases[selectedPhaseIdx]?.milestones[selectedMilestoneIdx]?.title || 'Curriculum Topic' : config.topic,
+                explanation: explanationText,
+                subject: viewMode === 'curriculum' ? selectedRoadmap?.title || 'General' : config.subject
                 })
             });
             const data = await res.json();
@@ -240,10 +240,10 @@ export const QuizMaster = ({ onComplete }: any) => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             user_email: user.email,
-                            topic: viewMode === 'curriculum' ? `${selectedRoadmap?.title} - ${selectedRoadmap?.phases[selectedPhaseIdx].name}` : config.topic,
+                            topic: viewMode === 'curriculum' ? `${selectedRoadmap?.title || 'Course'} - ${selectedRoadmap?.phases[selectedPhaseIdx]?.name || 'Topic'}` : config.topic,
                             score: score,
                             weak_areas: results?.filter(r => !r.is_correct).map(r => r.topic_tag) || [],
-                            subject: viewMode === 'curriculum' ? selectedRoadmap?.title : config.subject,
+                            subject: viewMode === 'curriculum' ? selectedRoadmap?.title || 'General' : config.subject,
                             domain: selectedRoadmap?.title || "General",
                             quiz_mode: quizMode,
                             average_confidence: avgConfidence
@@ -256,8 +256,8 @@ export const QuizMaster = ({ onComplete }: any) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         results: results,
-                        subject: viewMode === 'curriculum' ? selectedRoadmap?.title : config.subject,
-                        topic: viewMode === 'curriculum' ? selectedRoadmap?.phases[selectedPhaseIdx].name : config.topic
+                        subject: viewMode === 'curriculum' ? selectedRoadmap?.title || 'General' : config.subject,
+                        topic: viewMode === 'curriculum' ? selectedRoadmap?.phases[selectedPhaseIdx]?.name || 'Topic' : config.topic
                     })
                 });
                 const fbData = await fbRes.json();
@@ -285,7 +285,7 @@ export const QuizMaster = ({ onComplete }: any) => {
                         <h2 style={{ fontSize: '2rem', fontWeight: 900 }}>Teach the AI Mode</h2>
                         <p style={{ color: 'var(--text-secondary)' }}>Explain the concept below. The AI will evaluate your depth of understanding.</p>
                         <div className="mt-md px-md py-sm glass-pill" style={{ display: 'inline-block', background: 'rgba(255,255,255,0.05)' }}>
-                             TOPIC: <strong style={{ color: 'var(--primary-400)' }}>{viewMode === 'curriculum' ? selectedRoadmap?.phases[selectedPhaseIdx].milestones[selectedMilestoneIdx].title : config.topic}</strong>
+                             TOPIC: <strong style={{ color: 'var(--primary-400)' }}>{viewMode === 'curriculum' ? selectedRoadmap?.phases[selectedPhaseIdx]?.milestones[selectedMilestoneIdx]?.title || 'Topic' : config.topic}</strong>
                         </div>
                     </div>
 
@@ -344,8 +344,10 @@ export const QuizMaster = ({ onComplete }: any) => {
                          <div className="mt-lg">
                              <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-red)', marginBottom: '0.5rem' }}>CONCEPTS YOU MISSED</h4>
                              <div className="flex flex-wrap gap-xs">
-                                 {teachResult.missing_concepts?.map((c: string, i: number) => (
-                                     <span key={i} className="glass-pill" style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem', border: '1px solid rgba(231, 76, 60, 0.2)', color: 'var(--accent-red)' }}>{c}</span>
+                                 {teachResult.missing_concepts?.map((c: any, i: number) => (
+                                     <span key={i} className="glass-pill" style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem', border: '1px solid rgba(231, 76, 60, 0.2)', color: 'var(--accent-red)' }}>
+                                         {typeof c === 'string' ? c : (c.concept || c.title || JSON.stringify(c))}
+                                     </span>
                                  ))}
                              </div>
                          </div>
@@ -380,9 +382,9 @@ export const QuizMaster = ({ onComplete }: any) => {
                                         <KnowledgeGraph 
                                             data={feedback.knowledge_graph || [
                                                 { id: '1', label: 'Theory', level: score/100, status: score >= 80 ? 'done' : 'learning' },
-                                                { id: '2', label: 'Logic', level: 0.55, status: 'learning' },
-                                                { id: '3', label: 'Diagrams', level: 0.35, status: 'struggling' },
-                                                { id: '4', label: 'Systems', level: 0.65, status: 'learning' }
+                                                { id: '2', label: 'Logic', level: 0.6, status: 'learning' },
+                                                { id: '3', label: 'Systems', level: 0.5, status: 'learning' },
+                                                { id: '4', label: 'Implementation', level: 0.4, status: 'struggling' }
                                             ]} 
                                         />
                                     </div>
@@ -396,7 +398,12 @@ export const QuizMaster = ({ onComplete }: any) => {
                                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>AI is scanning your errors...</p>
                                     ) : (
                                         <ul style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                            {feedback?.gaps?.map((g: string, i: number) => <li key={i} className="flex items-center gap-xs"> <span style={{ color: 'var(--accent-red)' }}>⚠</span> {g}</li>) || <li>No major gaps identified</li>}
+                                            {feedback?.gaps?.map((g: any, i: number) => (
+                                                <li key={i} className="flex items-start gap-xs"> 
+                                                    <span style={{ color: 'var(--accent-red)', marginTop: '2px' }}>⚠</span> 
+                                                    <span>{typeof g === 'string' ? g : (g.explanation || g.question || JSON.stringify(g))}</span>
+                                                </li>
+                                            )) || <li>No major gaps identified</li>}
                                         </ul>
                                     )}
                                 </div>
@@ -406,7 +413,12 @@ export const QuizMaster = ({ onComplete }: any) => {
                                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Generating personalized improvement plan...</p>
                                     ) : (
                                         <ul style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                            {feedback?.plan?.map((p: string, i: number) => <li key={i} className="flex items-center gap-xs"> <span style={{ color: 'var(--accent-green)' }}>★</span> {p}</li>) || <li>Continue your learning path</li>}
+                                            {feedback?.plan?.map((p: any, i: number) => (
+                                                <li key={i} className="flex items-start gap-xs"> 
+                                                    <span style={{ color: 'var(--accent-green)', marginTop: '2px' }}>★</span> 
+                                                    <span>{typeof p === 'string' ? p : (p.step || p.action || JSON.stringify(p))}</span>
+                                                </li>
+                                            )) || <li>Continue your learning path</li>}
                                         </ul>
                                     )}
                                 </div>

@@ -11,6 +11,19 @@ interface AnalysisResult {
         advanced: string[];
         projects: string[];
     };
+    ats_score?: {
+        total_score: number;
+        breakdown: {
+            parseability: number;
+            keyword_match: number;
+            impact_metrics: number;
+            formatting: number;
+            section_completeness: number;
+        };
+        critical_keywords_found: string[];
+        missing_critical_keywords: string[];
+        improvement_suggestions: string[];
+    };
 }
 
 interface MarketSkills {
@@ -73,7 +86,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [marketSkills, setMarketSkills] = useState<MarketSkills | null>(null);
     const [marketLoading, setMarketLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'gap' | 'roadmap' | 'trends' | 'mentor' | 'mock'>('gap');
+    const [activeTab, setActiveTab] = useState<'gap' | 'roadmap' | 'trends' | 'mentor' | 'mock' | 'ats'>('gap');
     const [beginnerGuide, setBeginnerGuide] = useState<BeginnerGuide | null>(null);
     const [historicalTrends, setHistoricalTrends] = useState<HistoricalTrends | null>(null);
     const [guideLoading, setGuideLoading] = useState(false);
@@ -82,7 +95,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const [mockPlan, setMockPlan] = useState<any[]>([]);
     const [mockQuestions, setMockQuestions] = useState<string[]>([]);
     const [mockIndex, setMockIndex] = useState(0);
-    const [mockDifficulty, setMockDifficulty] = useState('Medium');
+    const [mockDifficulty, setMockDifficulty] = useState('Easy');
     const [currentQuestion, setCurrentQuestion] = useState<any>(null);
     const [mockEvals, setMockEvals] = useState<any[]>([]);
     const [userMockAnswer, setUserMockAnswer] = useState('');
@@ -90,6 +103,15 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const [mockComplete, setMockComplete] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef<any>(null);
+
+    // Coding challenge state
+    const [codingLanguage, setCodingLanguage] = useState('python');
+    const [userApproach, setUserApproach] = useState('');
+    const [userCode, setUserCode] = useState('');
+    const [codingPhase, setCodingPhase] = useState<'approach' | 'code' | 'results'>('approach');
+    const [runningTests, setRunningTests] = useState(false);
+    const [testResults, setTestResults] = useState<any>(null);
+    const [codingEval, setCodingEval] = useState<any>(null);
 
     // Initialize Speech Recognition
     useEffect(() => {
@@ -151,23 +173,23 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const startMockInterview = async () => {
         setIsMockLoading(true);
         setActiveTab('mock');
+        setMockIndex(0); setMockQuestions([]); setMockEvals([]); setMockComplete(false);
+        setCurrentQuestion(null); setUserMockAnswer(''); setUserApproach(''); setUserCode('');
+        setCodingPhase('approach'); setTestResults(null); setCodingEval(null);
         try {
+            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
             const res = await fetch('http://127.0.0.1:8000/coach/mock-interview/plan', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    role,
-                    domain,
-                    extracted_skills: result?.extracted_skills || []
+                    role, domain,
+                    extracted_skills: result?.extracted_skills || [],
+                    user_email: user.email
                 })
             });
             const data = await res.json();
             setMockPlan(data.plan);
-            setMockDifficulty(data.difficulty);
-            setMockIndex(0);
-            setMockQuestions([]);
-            setMockEvals([]);
-            setMockComplete(false);
+            setMockDifficulty(data.difficulty || 'Easy');
             fetchNextQuestion(data.plan[0], []);
         } catch (e) {
             console.error('Failed to start mock', e);
@@ -177,34 +199,71 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
     const fetchNextQuestion = async (planItem: any, asked: string[]) => {
         setIsMockLoading(true);
+        setUserMockAnswer(''); setUserApproach(''); setUserCode('');
+        setCodingPhase('approach'); setTestResults(null); setCodingEval(null);
         try {
+            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
             const res = await fetch('http://127.0.0.1:8000/coach/mock-interview/question', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    role,
-                    domain,
+                    role, domain,
                     plan_item: planItem,
                     asked_questions: asked,
-                    difficulty: mockDifficulty
+                    difficulty: planItem.difficulty || mockDifficulty,
+                    user_email: user.email
                 })
             });
             const data = await res.json();
             setCurrentQuestion(data);
             setMockQuestions([...asked, data.question]);
-            setUserMockAnswer('');
-            
-            // Audio Feedback for new question
             playInterviewSound('next');
-            
-            // Wait slightly before speaking to allow the pop sound to play
-            setTimeout(() => {
-                speakText(data.question);
-            }, 600);
-            
-        } catch (e) {
-            console.error(e);
-        }
+            setTimeout(() => speakText(data.question), 600);
+        } catch (e) { console.error(e); }
+        setIsMockLoading(false);
+    };
+
+    const runTests = async () => {
+        if (!currentQuestion?.test_cases) return;
+        setRunningTests(true);
+        try {
+            const res = await fetch('http://127.0.0.1:8000/coach/mock-interview/run-tests', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: userCode, language: codingLanguage, test_cases: currentQuestion.test_cases })
+            });
+            setTestResults(await res.json());
+        } catch (e) { console.error(e); }
+        setRunningTests(false);
+    };
+
+    const submitCodingAnswer = async () => {
+        setIsMockLoading(true);
+        try {
+            const res = await fetch('http://127.0.0.1:8000/coach/mock-interview/evaluate-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    role, domain,
+                    question: currentQuestion.question,
+                    approach_text: userApproach,
+                    code: userCode,
+                    language: codingLanguage,
+                    test_cases: currentQuestion.test_cases || []
+                })
+            });
+            const ev = await res.json();
+            setCodingEval(ev);
+            setCodingPhase('results');
+            const newEvals = [...mockEvals, { ...ev, question: currentQuestion.question, type: 'coding' }];
+            setMockEvals(newEvals);
+            const nextIdx = mockIndex + 1;
+            if (nextIdx >= (mockPlan?.length || 0)) {
+                setMockComplete(true);
+                playInterviewSound('finish');
+                saveSession(newEvals);
+            }
+        } catch (e) { console.error(e); }
         setIsMockLoading(false);
     };
 
@@ -214,31 +273,70 @@ export const InterviewCoach = ({ onComplete }: any) => {
             const res = await fetch('http://127.0.0.1:8000/coach/mock-interview/evaluate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    role,
-                    domain,
-                    question: currentQuestion.question,
-                    answer: userMockAnswer
-                })
+                body: JSON.stringify({ role, domain, question: currentQuestion.question, answer: userMockAnswer })
             });
             const ev = await res.json();
-            const newEvals = [...mockEvals, ev];
+            const newEvals = [...mockEvals, { ...ev, question: currentQuestion.question, type: 'standard' }];
             setMockEvals(newEvals);
-            
             const nextIdx = mockIndex + 1;
             if (nextIdx < (mockPlan?.length || 0)) {
                 setMockIndex(nextIdx);
-                const nextDiff = ev.overall_score >= 8 ? 'Hard' : (ev.overall_score >= 5 ? 'Medium' : 'Easy');
+                const nextDiff = ev.overall_score >= 8 ? 'Hard' : ev.overall_score >= 5 ? 'Medium' : 'Easy';
                 setMockDifficulty(nextDiff);
                 fetchNextQuestion(mockPlan[nextIdx], mockQuestions);
             } else {
                 setMockComplete(true);
                 playInterviewSound('finish');
+                saveSession(newEvals);
             }
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
         setIsMockLoading(false);
+    };
+
+    const advanceFromCodingRound = () => {
+        const nextIdx = mockIndex + 1;
+        if (nextIdx < (mockPlan?.length || 0)) {
+            setMockIndex(nextIdx);
+            fetchNextQuestion(mockPlan[nextIdx], mockQuestions);
+        } else {
+            setMockComplete(true);
+            playInterviewSound('finish');
+        }
+    };
+
+    const skipQuestion = () => {
+        const nextIdx = mockIndex + 1;
+        const skippedEval = {
+            question: currentQuestion.question,
+            overall_score: 0,
+            strengths: "N/A",
+            weaknesses: "Question was skipped by candidate.",
+            improved_answer: "N/A",
+            type: currentQuestion.category === 'coding' ? 'coding' : 'standard'
+        };
+        const newEvals = [...mockEvals, skippedEval];
+        setMockEvals(newEvals);
+
+        if (nextIdx < (mockPlan?.length || 0)) {
+            setMockIndex(nextIdx);
+            fetchNextQuestion(mockPlan[nextIdx], mockQuestions);
+        } else {
+            setMockComplete(true);
+            playInterviewSound('finish');
+            saveSession(newEvals);
+        }
+    };
+
+    const saveSession = async (evals: any[]) => {
+        try {
+            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            if (!user.email) return;
+            await fetch('http://127.0.0.1:8000/coach/mock-interview/save-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_email: user.email, role, domain, language: codingLanguage, evaluations: evals })
+            });
+        } catch { /* silent */ }
     };
 
     const speakText = (text: string) => {
@@ -248,6 +346,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
             window.speechSynthesis.speak(msg);
         }
     };
+
 
     useEffect(() => {
         const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
@@ -355,7 +454,8 @@ export const InterviewCoach = ({ onComplete }: any) => {
                     ),
                     missing_skills: data.missing_skills || [],
                     market_skills: stateSnapshot?.required_skills || [],
-                    strong_domains: data.strong_domains || []
+                    strong_domains: data.strong_domains || [],
+                    ats_score: data.ats_score || null
                 });
             }, 300);
             if (onComplete) onComplete();
@@ -400,6 +500,14 @@ export const InterviewCoach = ({ onComplete }: any) => {
                             {['Fresher', 'Junior', 'Mid-Level', 'Senior'].map(l => <option key={l}>{l}</option>)}
                         </select>
                     </div>
+
+                    <div className="flex-col gap-xs">
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Coding Language</span>
+                        <select value={codingLanguage} onChange={e => setCodingLanguage(e.target.value)} className="input-field" style={{ padding: '0.65rem' }}>
+                            {['python','javascript','java','cpp','go'].map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
+                        </select>
+                    </div>
+
 
                     {/* Resume Upload */}
                     <div
@@ -484,8 +592,8 @@ export const InterviewCoach = ({ onComplete }: any) => {
                         {/* Tab Navigation (Always show if we have data) */}
                         {(result || marketSkills || beginnerGuide || (mockPlan?.length || 0) > 0 || isMockLoading || mockComplete) && (
                             <div className="flex gap-sm flex-wrap">
-                                {(['gap', 'roadmap', 'trends', 'mentor', 'mock'] as const).map(tab => {
-                                    const isAvailable = (tab === 'gap' || tab === 'roadmap') ? !!result :
+                                {(['gap', 'roadmap', 'trends', 'mentor', 'mock', 'ats'] as const).map(tab => {
+                                    const isAvailable = (tab === 'gap' || tab === 'roadmap' || tab === 'ats') ? !!result :
                                                         (tab === 'trends') ? !!marketSkills :
                                                         (tab === 'mentor') ? !!beginnerGuide : 
                                                         (tab === 'mock') ? ((mockPlan?.length || 0) > 0 || isMockLoading) : false;
@@ -501,7 +609,8 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                             {tab === 'gap' ? '🎯 Skill Gap' : 
                                              tab === 'roadmap' ? '📋 Roadmap' : 
                                              tab === 'trends' ? '📊 Market Trends' : 
-                                             tab === 'mock' ? '🎙️ Mock Interview' : '👨‍🏫 Pro Mentor'}
+                                             tab === 'mock' ? '🎙️ Mock Interview' : 
+                                             tab === 'ats' ? '🧬 ATS Audit' : '👨‍🏫 Pro Mentor'}
                                         </button>
                                     );
                                 })}
@@ -577,6 +686,62 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* ATS Audit Section */}
+                        {activeTab === 'ats' && result?.ats_score && (
+                            <div className="flex-col gap-lg fade-in">
+                                <div className="glass-card" style={{ padding: '2rem', border: '1px solid var(--primary-500)', background: 'linear-gradient(135deg, rgba(139,92,246,0.05) 0%, transparent 100%)' }}>
+                                    <div className="flex justify-between items-center flex-wrap gap-xl">
+                                        <div style={{ textAlign: 'center' }}>
+                                            <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary-400)', letterSpacing: '2px', marginBottom: '8px' }}>ATS OPTIMIZATION SCORE</p>
+                                            <h3 style={{ fontSize: '4rem', fontWeight: 900, color: result.ats_score.total_score >= 80 ? 'var(--accent-green)' : result.ats_score.total_score >= 50 ? 'var(--accent-orange)' : 'var(--accent-red)' }}>
+                                                {result.ats_score.total_score}%
+                                            </h3>
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: '300px' }} className="flex-col gap-md">
+                                            {Object.entries(result.ats_score.breakdown).map(([key, val]) => (
+                                                <div key={key} className="flex-col gap-xs">
+                                                    <div className="flex justify-between" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                                                        <span style={{ textTransform: 'capitalize' }}>{key.replace('_', ' ')}</span>
+                                                        <span>{val}%</span>
+                                                    </div>
+                                                    <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                                                        <div style={{ height: '100%', width: `${val}%`, background: 'var(--primary-500)', borderRadius: '3px' }} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid-2 gap-lg">
+                                    <div className="glass-card" style={{ padding: '1.5rem' }}>
+                                        <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--accent-blue)', marginBottom: '1.25rem', textTransform: 'uppercase' }}>✅ Critical Keywords Found</h4>
+                                        <div className="flex flex-wrap gap-xs">
+                                            {result.ats_score.critical_keywords_found.map(k => <span key={k} className="badge" style={{ fontSize: '0.72rem', borderColor: 'rgba(56,183,248,0.2)' }}>{k}</span>)}
+                                        </div>
+                                    </div>
+                                    <div className="glass-card" style={{ padding: '1.5rem' }}>
+                                        <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--accent-red)', marginBottom: '1.25rem', textTransform: 'uppercase' }}>❌ Missing Domain Keywords</h4>
+                                        <div className="flex flex-wrap gap-xs">
+                                            {result.ats_score.missing_critical_keywords.map(k => <span key={k} className="badge" style={{ fontSize: '0.72rem', borderColor: 'rgba(239,68,68,0.2)', color: 'var(--accent-red)' }}>{k}</span>)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="glass-card" style={{ padding: '1.5rem', borderLeft: '6px solid var(--accent-orange)' }}>
+                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: 'white', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 'sm' }}>🛠️ Strategic Improvement Suggestions</h4>
+                                    <div className="flex-col gap-sm">
+                                        {result.ats_score.improvement_suggestions.map((s, i) => (
+                                            <div key={i} className="flex items-start gap-sm" style={{ padding: '0.8rem', background: 'rgba(245,158,11,0.03)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.1)' }}>
+                                                <span style={{ color: 'var(--accent-orange)', fontWeight: 900 }}>{i + 1}.</span>
+                                                <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{s}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -735,101 +900,343 @@ export const InterviewCoach = ({ onComplete }: any) => {
                         {/* Mock Interview */}
                         {activeTab === 'mock' && (
                             <div className="flex-col gap-lg fade-in">
+
+                                {/* Progress bar */}
+                                {!mockComplete && mockPlan.length > 0 && (
+                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        {mockPlan.map((p, i) => {
+                                            const done = i < mockIndex;
+                                            const active = i === mockIndex;
+                                            const color = p.type === 'coding' ? '#f59e0b' : done ? 'var(--primary-500)' : active ? 'var(--accent-blue)' : 'rgba(255,255,255,0.08)';
+                                            return (
+                                                <div key={i} style={{ flex: 1, height: '6px', borderRadius: '3px', background: color, transition: 'background 0.5s' }} title={`${p.type} – ${p.difficulty}`} />
+                                            );
+                                        })}
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{mockIndex + 1} / {mockPlan.length}</span>
+                                    </div>
+                                )}
+
                                 {!mockComplete ? (
                                     <div className="glass-card" style={{ padding: '2rem' }}>
                                         <div className="flex justify-between items-center" style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--glass-border)' }}>
-                                            <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>🤖 Live Interview Simulator</h3>
-                                            <span className="badge" style={{ background: 'var(--primary-500)', color: 'white' }}>Question {mockIndex + 1} / {mockPlan?.length || 0}</span>
+                                            <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>
+                                                {currentQuestion?.category === 'coding' ? '💻 Coding Challenge' : '🤖 Live Interview Simulator'}
+                                            </h3>
+                                            <div className="flex gap-sm">
+                                                {currentQuestion?.difficulty && (
+                                                    <span className="badge" style={{
+                                                        background: currentQuestion.difficulty === 'Easy' ? '#059669' : currentQuestion.difficulty === 'Medium' ? '#d97706' : '#dc2626',
+                                                        color: 'white', fontSize: '0.72rem'
+                                                    }}>{currentQuestion.difficulty}</span>
+                                                )}
+                                                <span className="badge" style={{ background: 'var(--primary-500)', color: 'white' }}>Q{mockIndex + 1}/{mockPlan?.length || 0}</span>
+                                            </div>
                                         </div>
-                                        
+
                                         {currentQuestion ? (
-                                            <div className="flex-col gap-lg">
-                                                <div style={{ background: 'rgba(56,183,248,0.05)', border: '1px solid rgba(56,183,248,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
-                                                    <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-blue)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem' }}>Scenario / Question ({mockDifficulty})</p>
-                                                    <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>{currentQuestion.question}</p>
+                                            currentQuestion.category === 'coding' ? (
+                                                /* ── CODING CHALLENGE ─────────────────────────────── */
+                                                <div className="flex-col gap-lg">
+                                                    {/* Problem statement */}
+                                                    <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.25)', padding: '1.5rem', borderRadius: '12px' }}>
+                                                        <p style={{ fontSize: '0.72rem', fontWeight: 900, color: '#f59e0b', letterSpacing: '1px', marginBottom: '0.5rem' }}>
+                                                            {currentQuestion.topic?.toUpperCase() || 'DSA'} – {currentQuestion.difficulty?.toUpperCase()}
+                                                        </p>
+                                                        <p style={{ fontSize: '1rem', color: 'var(--text-primary)', lineHeight: 1.7 }}>{currentQuestion.question}</p>
+                                                    </div>
+
+                                                    {/* Examples */}
+                                                    {currentQuestion.examples?.length > 0 && (
+                                                        <div className="flex-col gap-sm">
+                                                            <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>EXAMPLES:</p>
+                                                            {currentQuestion.examples.map((ex: any, i: number) => (
+                                                                <div key={i} style={{ background: 'rgba(0,0,0,0.5)', padding: '0.85rem 1rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.82rem', color: '#e2e8f0' }}>
+                                                                    <span style={{ color: '#60a5fa', fontWeight: 700 }}>Input:</span> {ex.input} &nbsp;
+                                                                    <span style={{ color: '#10b981', fontWeight: 700 }}>Output:</span> {ex.output}
+                                                                    {ex.explanation && <span style={{ color: '#94a3b8', marginLeft: '0.5rem' }}> — {ex.explanation}</span>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Phase tabs */}
+                                                    <div className="flex gap-sm">
+                                                        {(['approach','code','results'] as const).map(ph => (
+                                                            <button key={ph} onClick={() => setCodingPhase(ph)}
+                                                                className={codingPhase === ph ? 'btn btn-primary' : 'btn btn-secondary'}
+                                                                style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }}
+                                                                disabled={ph === 'results' && !codingEval}>
+                                                                {ph === 'approach' ? '1️⃣ Explain Approach' : ph === 'code' ? '2️⃣ Write & Run Code' : '3️⃣ Results'}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* PHASE 1: Approach */}
+                                                    {codingPhase === 'approach' && (
+                                                        <div className="flex-col gap-md">
+                                                            <label style={{ fontSize: '0.85rem', fontWeight: 800 }}>Explain your approach before coding:</label>
+                                                            {currentQuestion.hints?.length > 0 && (
+                                                                <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', padding: '0.85rem', borderRadius: '8px' }}>
+                                                                    <p style={{ fontSize: '0.72rem', color: '#a78bfa', fontWeight: 800 }}>💡 HINTS (optional):</p>
+                                                                    {currentQuestion.hints.map((h: string, i: number) => <p key={i} style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>• {h}</p>)}
+                                                                </div>
+                                                            )}
+                                                            <textarea value={userApproach} onChange={e => setUserApproach(e.target.value)}
+                                                                className="input-field" style={{ minHeight: '130px', padding: '1rem', fontFamily: 'inherit' }}
+                                                                placeholder="Describe your algorithm. e.g. I'll use a hash map to track seen elements for O(n) time complexity..." />
+                                                            <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }}
+                                                                onClick={() => setCodingPhase('code')} disabled={userApproach.trim().length < 10}>
+                                                                Next: Write Code →
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* PHASE 2: Code Editor */}
+                                                    {codingPhase === 'code' && (
+                                                        <div className="flex-col gap-md">
+                                                            <div className="flex justify-between items-center">
+                                                                <label style={{ fontSize: '0.85rem', fontWeight: 800 }}>Write your solution:</label>
+                                                                <select value={codingLanguage} onChange={e => { setCodingLanguage(e.target.value); setUserCode(''); }}
+                                                                    className="input-field" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: 'auto' }}>
+                                                                    {['python','javascript','java','cpp','go'].map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}
+                                                                </select>
+                                                            </div>
+                                                            {/* Function signature hint */}
+                                                            {currentQuestion.function_signature?.[codingLanguage] && !userCode && (
+                                                                <div style={{ background: 'rgba(0,0,0,0.5)', padding: '0.85rem 1rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.8rem', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                                    <p style={{ fontSize: '0.68rem', color: 'var(--primary-400)', marginBottom: '0.4rem', fontWeight: 800 }}>STARTER TEMPLATE:</p>
+                                                                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#cbd5e1' }}>{currentQuestion.function_signature[codingLanguage]}</pre>
+                                                                    <button onClick={() => setUserCode(currentQuestion.function_signature[codingLanguage])}
+                                                                        style={{ marginTop: '0.6rem', fontSize: '0.75rem', color: 'var(--accent-blue)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}>
+                                                                        Use template ↗
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                            <textarea value={userCode} onChange={e => setUserCode(e.target.value)}
+                                                                className="input-field"
+                                                                style={{ minHeight: '250px', padding: '1rem', fontFamily: 'monospace', fontSize: '0.9rem', background: 'rgba(0,0,0,0.4)', lineHeight: 1.6 }}
+                                                                placeholder={`Write your ${codingLanguage} solution here...`} />
+
+                                                            {/* Test Results Preview */}
+                                                            {testResults && (
+                                                                <div style={{ background: testResults.all_passed ? 'rgba(5,150,105,0.08)' : 'rgba(239,68,68,0.06)', border: `1px solid ${testResults.all_passed ? '#059669' : '#dc2626'}`, padding: '1rem', borderRadius: '10px' }}>
+                                                                    <div className="flex justify-between items-center" style={{ marginBottom: '0.75rem' }}>
+                                                                        <strong style={{ color: testResults.all_passed ? '#34d399' : '#f87171' }}>
+                                                                            {testResults.all_passed ? '✅ All Tests Passed!' : `❌ ${testResults.passed}/${testResults.total} Tests Passed`}
+                                                                        </strong>
+                                                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{testResults.score_pct}% score</span>
+                                                                    </div>
+                                                                    {testResults.test_results?.map((tc: any, i: number) => (
+                                                                        <div key={i} style={{ marginBottom: '0.5rem', padding: '0.6rem', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                                                                            <span style={{ color: tc.passed ? '#34d399' : '#f87171' }}>{tc.passed ? '✓' : '✗'}</span>
+                                                                            {' '}Input: <span style={{ color: '#60a5fa' }}>{tc.input}</span>
+                                                                            {' '}→ Expected: <span style={{ color: '#34d399' }}>{tc.expected}</span>
+                                                                            {!tc.passed && <span style={{ color: '#f87171' }}> Got: {tc.actual || tc.error}</span>}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            <div className="flex gap-md">
+                                                                <button className="btn btn-secondary" onClick={runTests} disabled={runningTests || userCode.trim().length < 5}
+                                                                    style={{ padding: '0.75rem 1.5rem' }}>
+                                                                    {runningTests ? '⏳ Running...' : '▶ Run & Test'}
+                                                                </button>
+                                                                <button className="btn btn-primary" onClick={submitCodingAnswer}
+                                                                    disabled={isMockLoading || userCode.trim().length < 10}
+                                                                    style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #059669, #10b981)' }}>
+                                                                    {isMockLoading ? '⏳ Evaluating...' : '✅ Submit for AI Feedback'}
+                                                                </button>
+                                                                <button className="btn btn-secondary" onClick={skipQuestion} style={{ opacity: 0.6, fontSize: '0.8rem' }}>
+                                                                    ⏩ Skip Round
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* PHASE 3: Results */}
+                                                    {codingPhase === 'results' && codingEval && (
+                                                        <div className="flex-col gap-lg">
+                                                            {/* Score Cards */}
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '0.75rem' }}>
+                                                                {[
+                                                                    { label: 'Overall', val: codingEval.overall_score, color: '#6366f1' },
+                                                                    { label: 'Correctness', val: codingEval.correctness_score, color: '#059669' },
+                                                                    { label: 'Approach', val: codingEval.approach_score, color: '#d97706' },
+                                                                    { label: 'Code Quality', val: codingEval.code_quality_score, color: '#0891b2' },
+                                                                ].map(({ label, val, color }) => (
+                                                                    <div key={label} style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '10px', textAlign: 'center', border: `1px solid ${color}33` }}>
+                                                                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '4px' }}>{label.toUpperCase()}</p>
+                                                                        <p style={{ fontSize: '2rem', fontWeight: 900, color, lineHeight: 1 }}>{val}<span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>/10</span></p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+
+                                                            {/* Complexity */}
+                                                            <div className="flex gap-md flex-wrap">
+                                                                <span className="badge" style={{ background: 'rgba(100,130,255,0.1)', color: 'var(--primary-400)' }}>⏱ Time: {codingEval.time_complexity}</span>
+                                                                <span className="badge" style={{ background: 'rgba(100,130,255,0.1)', color: 'var(--primary-400)' }}>🗄 Space: {codingEval.space_complexity}</span>
+                                                                {codingEval.test_execution?.passed !== undefined && (
+                                                                    <span className="badge" style={{ background: codingEval.test_execution.all_passed ? 'rgba(5,150,105,0.15)' : 'rgba(239,68,68,0.15)', color: codingEval.test_execution.all_passed ? '#34d399' : '#f87171' }}>
+                                                                        Tests: {codingEval.test_execution.passed}/{codingEval.test_execution.total}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Strengths/Weaknesses */}
+                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                                                <div style={{ background: 'rgba(5,150,105,0.05)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(5,150,105,0.15)' }}>
+                                                                    <strong style={{ color: '#34d399', fontSize: '0.8rem' }}>✅ Strengths</strong>
+                                                                    <p style={{ fontSize: '0.85rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>{codingEval.strengths}</p>
+                                                                </div>
+                                                                <div style={{ background: 'rgba(239,68,68,0.05)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                                                    <strong style={{ color: '#f87171', fontSize: '0.8rem' }}>⚠️ Weaknesses</strong>
+                                                                    <p style={{ fontSize: '0.85rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>{codingEval.weaknesses}</p>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Optimal Solution */}
+                                                            <div style={{ background: 'rgba(56,183,248,0.05)', padding: '1.25rem', borderRadius: '10px', border: '1px solid rgba(56,183,248,0.15)' }}>
+                                                                <strong style={{ color: 'var(--accent-blue)', fontSize: '0.8rem' }}>🏆 Optimal Approach</strong>
+                                                                <p style={{ fontSize: '0.88rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>{codingEval.optimal_solution}</p>
+                                                                {codingEval.improved_code && (
+                                                                    <pre style={{ marginTop: '0.75rem', background: 'rgba(0,0,0,0.4)', padding: '1rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.8rem', overflowX: 'auto', whiteSpace: 'pre-wrap', color: '#a5b4fc' }}>
+                                                                        {codingEval.improved_code}
+                                                                    </pre>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Advice */}
+                                                            <div style={{ background: 'rgba(245,158,11,0.05)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(245,158,11,0.15)' }}>
+                                                                <strong style={{ color: '#f59e0b', fontSize: '0.8rem' }}>💡 Coach Advice</strong>
+                                                                <p style={{ fontSize: '0.88rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>{codingEval.advice}</p>
+                                                            </div>
+
+                                                            {mockIndex + 1 < (mockPlan?.length || 0) && (
+                                                                <button className="btn btn-primary" onClick={advanceFromCodingRound} style={{ alignSelf: 'flex-start', padding: '0.8rem 2rem' }}>
+                                                                    Next Question →
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                
-                                                <div className="flex-col gap-sm">
-                                                    <div className="flex justify-between items-center">
-                                                        <label style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)' }}>Your Answer:</label>
-                                                        <button 
-                                                            onClick={toggleListening}
-                                                            className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'}`}
-                                                            style={{ 
-                                                                padding: '0.4rem 1rem', 
-                                                                fontSize: '0.8rem',
-                                                                background: isListening ? '#EF4444' : 'var(--glass-border)',
-                                                                color: isListening ? 'white' : 'var(--text-primary)',
-                                                                border: 'none',
-                                                                animation: isListening ? 'pulse 2s infinite' : 'none'
-                                                            }}
-                                                        >
-                                                            {isListening ? '⏹️ Stop Recording' : '🎤 Speak Answer'}
+                                            ) : (
+                                                /* ── STANDARD Q&A ─────────────────────────────── */
+                                                <div className="flex-col gap-lg">
+                                                    <div style={{ background: 'rgba(56,183,248,0.05)', border: '1px solid rgba(56,183,248,0.2)', padding: '1.5rem', borderRadius: '12px' }}>
+                                                        <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-blue)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem' }}>
+                                                            {currentQuestion.category?.replace('_', ' ')} — {currentQuestion.difficulty || mockDifficulty}
+                                                        </p>
+                                                        <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>{currentQuestion.question}</p>
+                                                    </div>
+
+                                                    {currentQuestion.expected_key_points?.length > 0 && (
+                                                        <div style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', padding: '0.85rem 1rem', borderRadius: '8px' }}>
+                                                            <p style={{ fontSize: '0.68rem', color: '#a78bfa', fontWeight: 900 }}>WHAT INTERVIEWERS LOOK FOR:</p>
+                                                            <div className="flex flex-wrap gap-xs" style={{ marginTop: '0.5rem' }}>
+                                                                {currentQuestion.expected_key_points.map((kp: string) => <span key={kp} className="badge" style={{ fontSize: '0.7rem', borderColor: 'rgba(139,92,246,0.3)', color: '#c4b5fd' }}>{kp}</span>)}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex-col gap-sm">
+                                                        <div className="flex justify-between items-center">
+                                                            <label style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)' }}>Your Answer:</label>
+                                                            <button onClick={toggleListening}
+                                                                className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'}`}
+                                                                style={{
+                                                                    padding: '0.4rem 1rem', fontSize: '0.8rem',
+                                                                    background: isListening ? '#EF4444' : 'var(--glass-border)',
+                                                                    color: isListening ? 'white' : 'var(--text-primary)', border: 'none',
+                                                                    animation: isListening ? 'pulse 2s infinite' : 'none'
+                                                                }}>
+                                                                {isListening ? '⏹️ Stop Recording' : '🎤 Speak Answer'}
+                                                            </button>
+                                                        </div>
+                                                        <textarea value={userMockAnswer} onChange={e => setUserMockAnswer(e.target.value)}
+                                                            className="input-field"
+                                                            style={{ minHeight: '150px', padding: '1rem',
+                                                                background: isListening ? 'rgba(239,68,68,0.05)' : 'rgba(0,0,0,0.2)',
+                                                                border: isListening ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--glass-border)' }}
+                                                            placeholder="Type your answer here or click 'Speak Answer'... (Tip: Use the STAR method)" />
+                                                    </div>
+
+                                                    <div className="flex gap-md">
+                                                        <button className="btn btn-primary" onClick={submitMockAnswer}
+                                                            disabled={isMockLoading || userMockAnswer.trim().length === 0}
+                                                            style={{ alignSelf: 'flex-start', padding: '0.8rem 2rem' }}>
+                                                            {isMockLoading ? '⏳ Evaluating...' : 'Submit Answer →'}
+                                                        </button>
+                                                        <button className="btn btn-secondary" onClick={skipQuestion} style={{ opacity: 0.6 }}>
+                                                            ⏩ Skip Question
                                                         </button>
                                                     </div>
-                                                    <textarea 
-                                                        value={userMockAnswer}
-                                                        onChange={(e) => setUserMockAnswer(e.target.value)}
-                                                        className="input-field" 
-                                                        style={{ 
-                                                            minHeight: '150px', 
-                                                            padding: '1rem',
-                                                            background: isListening ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0,0,0,0.2)',
-                                                            border: isListening ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--glass-border)'
-                                                        }}
-                                                        placeholder="Type your answer here or click 'Speak Answer'... (Tip: Use the STAR method)"
-                                                    />
                                                 </div>
-                                                
-                                                <button 
-                                                    className="btn btn-primary" 
-                                                    onClick={submitMockAnswer}
-                                                    disabled={isMockLoading || userMockAnswer.trim().length === 0}
-                                                    style={{ alignSelf: 'flex-start', padding: '0.8rem 2rem' }}
-                                                >
-                                                    {isMockLoading ? 'Evaluating...' : 'Submit Answer'}
-                                                </button>
-                                            </div>
+                                            )
                                         ) : (
                                             <div className="flex-col items-center justify-center py-xl">
                                                 <div style={{ width: '40px', height: '40px', border: '3px solid rgba(100,130,255,0.2)', borderTopColor: 'var(--primary-500)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                                                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>AI generating custom scenario...</p>
+                                                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>AI generating personalised question…</p>
                                             </div>
                                         )}
                                     </div>
                                 ) : (
+                                    /* ── FINAL RESULTS ─────────────────────────────── */
                                     <div className="glass-card" style={{ padding: '2rem' }}>
-                                        <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '2rem', textAlign: 'center', color: 'var(--primary-500)' }}>📊 Final Interview Performance</h3>
-                                        
-                                        <div className="flex-col gap-lg mt-xl">
+                                        <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '0.5rem', textAlign: 'center', color: 'var(--primary-500)' }}>📊 Final Interview Report</h3>
+                                        <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '0.85rem' }}>
+                                            Your results are saved. Next session will adapt to your weak spots.
+                                        </p>
+
+                                        {/* Average score */}
+                                        {mockEvals.length > 0 && (
+                                            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                                                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '1px' }}>AVERAGE SCORE</p>
+                                                <p style={{ fontSize: '3rem', fontWeight: 900, color: 'var(--primary-500)', lineHeight: 1 }}>
+                                                    {(mockEvals.reduce((s, e) => s + (e.overall_score || 0), 0) / mockEvals.length).toFixed(1)}<span style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>/10</span>
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex-col gap-lg">
                                             {mockEvals.map((ev, i) => (
                                                 <div key={i} style={{ border: '1px solid var(--glass-border)', padding: '1.5rem', borderRadius: '12px', background: 'rgba(255,255,255,0.02)' }}>
-                                                    <div className="flex justify-between" style={{ marginBottom: '1rem' }}>
-                                                        <h4 style={{ fontSize: '1rem', fontWeight: 800 }}>Q{i+1}: {mockQuestions[i]}</h4>
-                                                        <span className="badge" style={{ background: ev.overall_score >= 8 ? 'var(--primary-500)' : (ev.overall_score >= 5 ? 'var(--accent-orange)' : 'var(--accent-red)'), color: 'white', alignSelf: 'flex-start' }}>Score: {ev.overall_score}/10</span>
-                                                    </div>
-                                                    
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                                                        <div style={{ background: 'rgba(100,130,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
-                                                            <strong style={{ color: 'var(--primary-500)', fontSize: '0.8rem' }}>Strengths:</strong>
-                                                            <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>{ev.strengths}</p>
+                                                    <div className="flex justify-between items-center" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                        <div className="flex gap-sm items-center flex-wrap" style={{ flex: 1, minWidth: 0 }}>
+                                                            <span className="badge" style={{ fontSize: '0.68rem', background: ev.type === 'coding' ? 'rgba(245,158,11,0.15)' : 'rgba(100,130,255,0.1)', color: ev.type === 'coding' ? '#f59e0b' : 'var(--primary-400)', flexShrink: 0 }}>
+                                                                {ev.type === 'coding' ? '💻 Coding' : '💬 Verbal'}
+                                                            </span>
+                                                            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                Q{i+1}: {ev.question?.slice(0,70)}{ev.question?.length > 70 ? '…' : ''}
+                                                            </h4>
                                                         </div>
-                                                        <div style={{ background: 'rgba(239,68,68,0.05)', padding: '1rem', borderRadius: '8px' }}>
-                                                            <strong style={{ color: 'var(--accent-red)', fontSize: '0.8rem' }}>Weaknesses:</strong>
-                                                            <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>{ev.weaknesses}</p>
+                                                        <span className="badge" style={{ background: ev.overall_score >= 8 ? 'var(--primary-500)' : ev.overall_score >= 5 ? 'var(--accent-orange)' : 'var(--accent-red)', color: 'white', flexShrink: 0 }}>
+                                                            {ev.overall_score}/10
+                                                        </span>
+                                                    </div>
+
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                                                        <div style={{ background: 'rgba(100,130,255,0.05)', padding: '0.85rem', borderRadius: '8px' }}>
+                                                            <strong style={{ color: 'var(--primary-500)', fontSize: '0.78rem' }}>✅ Strengths</strong>
+                                                            <p style={{ fontSize: '0.82rem', marginTop: '0.4rem' }}>{ev.strengths}</p>
+                                                        </div>
+                                                        <div style={{ background: 'rgba(239,68,68,0.05)', padding: '0.85rem', borderRadius: '8px' }}>
+                                                            <strong style={{ color: 'var(--accent-red)', fontSize: '0.78rem' }}>⚠️ Weaknesses</strong>
+                                                            <p style={{ fontSize: '0.82rem', marginTop: '0.4rem' }}>{ev.weaknesses}</p>
                                                         </div>
                                                     </div>
-                                                    
-                                                    <div style={{ background: 'rgba(56,183,248,0.05)', padding: '1rem', borderRadius: '8px' }}>
-                                                        <strong style={{ color: 'var(--accent-blue)', fontSize: '0.8rem' }}>Senior Expert Answer:</strong>
-                                                        <p style={{ fontSize: '0.85rem', marginTop: '0.5rem', fontStyle: 'italic' }}>"{ev.improved_answer}"</p>
+                                                    <div style={{ background: 'rgba(56,183,248,0.04)', padding: '0.85rem', borderRadius: '8px' }}>
+                                                        <strong style={{ color: 'var(--accent-blue)', fontSize: '0.78rem' }}>�� {ev.type === 'coding' ? 'Optimal Solution' : 'Model Answer'}</strong>
+                                                        <p style={{ fontSize: '0.82rem', marginTop: '0.4rem', fontStyle: 'italic', color: 'var(--text-secondary)' }}>"{ev.improved_answer || ev.optimal_solution}"</p>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
-                                        
+
                                         <div className="flex justify-center" style={{ marginTop: '2rem' }}>
-                                            <button className="btn btn-primary" onClick={startMockInterview} style={{ padding: '0.8rem 2rem' }}>🔄 Take Another Mock Interview</button>
+                                            <button className="btn btn-primary" onClick={startMockInterview} style={{ padding: '0.9rem 2.5rem', fontWeight: 800 }}>
+                                                🔄 New Adaptive Interview
+                                            </button>
                                         </div>
                                     </div>
                                 )}

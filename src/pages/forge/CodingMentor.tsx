@@ -47,6 +47,7 @@ export const CodingMentor = ({ onComplete }: any) => {
     const [isEnhancing, setIsEnhancing] = useState(false);
     const [isComparing, setIsComparing] = useState(false);
     const [compareResults, setCompareResults] = useState<any[]>([]);
+    const codeLocked = !problemDesc.trim();
 
     const { profile } = useEdunovas();
 
@@ -105,6 +106,7 @@ export const CodingMentor = ({ onComplete }: any) => {
         if (problemDesc.trim() && code.trim()) triggerLineAnalysis();
     }, [code, problemDesc, triggerLineAnalysis]);
 
+
     // ── Actions ─────────────────────────────────────────────────
     const handleExecute = async () => {
         setIsExecuting(true);
@@ -119,7 +121,8 @@ export const CodingMentor = ({ onComplete }: any) => {
         setIsExecuting(false);
     };
 
-    const handleAnalyze = async () => {
+    const handleAnalyze = useCallback(async () => {
+        if (!code.trim() || isAnalyzing) return;
         setIsAnalyzing(true);
         setActiveTab('analysis');
         const fd = new FormData();
@@ -133,9 +136,10 @@ export const CodingMentor = ({ onComplete }: any) => {
             if (onComplete) onComplete();
         } catch (e) { console.error(e); }
         setIsAnalyzing(false);
-    };
+    }, [code, language, isAnalyzing, onComplete]);
 
-    const handleGenerateTests = async () => {
+    const handleGenerateTests = useCallback(async () => {
+        if (!code.trim() || isGeneratingTests) return;
         setIsGeneratingTests(true);
         setActiveTab('tests');
         const fd = new FormData();
@@ -148,9 +152,10 @@ export const CodingMentor = ({ onComplete }: any) => {
             setTestCases(d.test_cases || []);
         } catch (e) { console.error(e); }
         setIsGeneratingTests(false);
-    };
+    }, [code, problemDesc, language, isGeneratingTests]);
 
-    const handleFetchRefs = async () => {
+    const handleFetchRefs = useCallback(async () => {
+        if (!code.trim() || isFetchingRefs) return;
         setIsFetchingRefs(true);
         setActiveTab('references');
         const fd = new FormData();
@@ -162,9 +167,10 @@ export const CodingMentor = ({ onComplete }: any) => {
             setReferences([...(d.github || []), ...(d.stackoverflow || [])]);
         } catch (e) { console.error(e); }
         setIsFetchingRefs(false);
-    };
+    }, [code, language, isFetchingRefs]);
 
-    const handleEnhance = async () => {
+    const handleEnhance = useCallback(async () => {
+        if (!code.trim() || isEnhancing) return;
         setIsEnhancing(true);
         setActiveTab('enhance');
         setCompareResults([]);
@@ -178,7 +184,7 @@ export const CodingMentor = ({ onComplete }: any) => {
             setEnhancedCode(d);
         } catch (e) { console.error(e); }
         setIsEnhancing(false);
-    };
+    }, [code, problemDesc, language, isEnhancing]);
 
     const handleCompare = async () => {
         if (!enhancedCode?.enhanced_code) return;
@@ -197,8 +203,22 @@ export const CodingMentor = ({ onComplete }: any) => {
         setIsComparing(false);
     };
 
+    // ── Auto-trigger logic on tab change ─────────────
+    useEffect(() => {
+        if (codeLocked || !code.trim() || !problemDesc.trim()) return;
+
+        if (activeTab === 'analysis' && !analysis && !isAnalyzing) {
+            handleAnalyze();
+        } else if (activeTab === 'references' && references.length === 0 && !isFetchingRefs) {
+            handleFetchRefs();
+        } else if (activeTab === 'tests' && testCases.length === 0 && !isGeneratingTests) {
+            handleGenerateTests();
+        } else if (activeTab === 'enhance' && !enhancedCode && !isEnhancing) {
+            handleEnhance();
+        }
+    }, [activeTab, codeLocked, code, problemDesc, analysis, isAnalyzing, references.length, isFetchingRefs, testCases.length, isGeneratingTests, enhancedCode, isEnhancing, handleAnalyze, handleFetchRefs, handleGenerateTests, handleEnhance]);
+
     // ── Derived values ───────────────────────────────────────────
-    const codeLocked = !problemDesc.trim();
     const langCfg = LANG_CONFIG[language];
     const okLines = lineResults.filter(l => l.status === 'ok').length;
     const warnLines = lineResults.filter(l => l.status === 'warn').length;
@@ -566,8 +586,8 @@ export const CodingMentor = ({ onComplete }: any) => {
                             </>
                         ) : (
                             <div className="glass-card flex-col items-center justify-center" style={{ minHeight: '400px', opacity: 0.5 }}>
-                                <span style={{ fontSize: '3rem' }}>🧠</span>
-                                <p style={{ fontWeight: 600 }}>Click "Mentor Feedback" to get AI analysis</p>
+                                <span style={{ fontSize: '3rem' }}>{isAnalyzing ? '🧠' : '🧠'}</span>
+                                <p style={{ fontWeight: 600 }}>{isAnalyzing ? 'Decoding logic & searching for bugs...' : 'Click "Mentor Feedback" to get AI analysis'}</p>
                             </div>
                         )}
                     </div>
@@ -591,8 +611,8 @@ export const CodingMentor = ({ onComplete }: any) => {
                             </div>
                         )) : (
                             <div className="glass-card flex-col items-center justify-center" style={{ minHeight: '400px', opacity: 0.5 }}>
-                                <span style={{ fontSize: '3rem' }}>🔗</span>
-                                <p style={{ fontWeight: 600 }}>Click "References" in the editor to fetch real-world examples from GitHub & StackOverflow</p>
+                                <span style={{ fontSize: '3rem' }}>{isFetchingRefs ? '⏳' : '🔗'}</span>
+                                <p style={{ fontWeight: 600 }}>{isFetchingRefs ? 'Searching GitHub & StackOverflow for similar code...' : 'Click "References" in the editor to fetch real-world examples from GitHub & StackOverflow'}</p>
                             </div>
                         )}
                     </div>
@@ -621,7 +641,7 @@ export const CodingMentor = ({ onComplete }: any) => {
                         )) : (
                             <div className="glass-card flex-col items-center justify-center" style={{ minHeight: '400px', opacity: 0.5 }}>
                                 <span style={{ fontSize: '3rem' }}>🧪</span>
-                                <p style={{ fontWeight: 600 }}>Click "Gen Tests" in the editor to generate AI test cases</p>
+                                <p style={{ fontWeight: 600 }}>{isGeneratingTests ? 'Generating edge-case test suite...' : 'Click "Gen Tests" in the editor to generate AI test cases'}</p>
                             </div>
                         )}
                     </div>
@@ -687,14 +707,25 @@ export const CodingMentor = ({ onComplete }: any) => {
                                                 const memMax = Math.max(...compareResults.map(r => r.memory || 1));
                                                 return (
                                                     <div key={i} style={{ background: 'var(--bg-tertiary)', padding: '1.25rem', borderRadius: '10px', border: `1px solid ${i === 1 ? 'var(--primary-500)' : 'var(--border-subtle)'}` }}>
-                                                        <div style={{ fontWeight: 800, color: i === 1 ? 'var(--primary-400)' : 'var(--text-primary)', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                                                            {res.name} Code
+                                                        <div style={{ fontWeight: 800, color: i === 1 ? 'var(--primary-400)' : 'var(--text-primary)', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                {res.name} Code
+                                                                {i === 1 && (
+                                                                    <span style={{ 
+                                                                        fontSize: '0.55rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 900,
+                                                                        background: res.time < compareResults[0].time ? 'rgba(39,201,63,0.1)' : res.time > compareResults[0].time ? 'rgba(255,95,86,0.1)' : 'rgba(139,148,158,0.1)',
+                                                                        color: res.time < compareResults[0].time ? '#27c93f' : res.time > compareResults[0].time ? '#ff5f56' : '#8b949e'
+                                                                    }}>
+                                                                        {res.time < compareResults[0].time ? '⚡ FASTER' : res.time > compareResults[0].time ? '⚠️ SLOWER' : '− EQUAL'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <span style={{ fontSize: '0.65rem', color: res.success ? '#27c93f' : '#ff5f56' }}>{res.success ? '✅ PASSED' : '❌ FAILED'}</span>
                                                         </div>
                                                         <div className="flex-col gap-sm">
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                                                 <span>Execution Time</span>
-                                                                <span style={{ fontWeight: 800, color: i === 1 && res.time < compareResults[0].time ? 'var(--accent-green)' : 'var(--text-primary)' }}>{res.time}s</span>
+                                                                <span style={{ fontWeight: 800, color: i === 1 ? (res.time < compareResults[0].time ? '#27c93f' : res.time > compareResults[0].time ? '#ff5f56' : 'var(--text-primary)') : 'var(--text-primary)' }}>{res.time}s</span>
                                                             </div>
                                                             <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
                                                                 <div style={{ height: '100%', width: `${Math.max(5, (res.time / timeMax) * 100)}%`, background: i === 1 ? 'var(--primary-500)' : '#8b949e' }} />
@@ -702,7 +733,7 @@ export const CodingMentor = ({ onComplete }: any) => {
                                                             
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
                                                                 <span>Memory Used</span>
-                                                                <span style={{ fontWeight: 800, color: i === 1 && res.memory < compareResults[0].memory ? 'var(--accent-green)' : 'var(--text-primary)' }}>{res.memory}MB</span>
+                                                                <span style={{ fontWeight: 800, color: i === 1 ? (res.memory < compareResults[0].memory ? '#27c93f' : res.memory > compareResults[0].memory ? '#ff5f56' : 'var(--text-primary)') : 'var(--text-primary)' }}>{res.memory}MB</span>
                                                             </div>
                                                             <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
                                                                 <div style={{ height: '100%', width: `${Math.max(5, (res.memory / memMax) * 100)}%`, background: i === 1 ? 'var(--primary-500)' : '#8b949e' }} />

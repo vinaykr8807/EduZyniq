@@ -11,7 +11,7 @@ export const KnowledgeGraph = ({ data }: { data: KnowledgeNode[] }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
-        if (!canvasRef.current || !data) return;
+        if (!canvasRef.current || !data || !Array.isArray(data)) return;
         const ctx = canvasRef.current.getContext('2d');
         if (!ctx) return;
 
@@ -32,43 +32,47 @@ export const KnowledgeGraph = ({ data }: { data: KnowledgeNode[] }) => {
         }
 
         // Draw Nodes
-        const angleStep = (Math.PI * 2) / data.length;
+        const angleStep = data.length > 0 ? (Math.PI * 2) / data.length : 0;
         data.forEach((node, i) => {
             const angle = i * angleStep;
-            const radius = (node.level * (width / 2 - 40)) + 20;
+            // Defensive check for level
+            const level = (node.level !== undefined && !isNaN(node.level) && isFinite(node.level)) ? node.level : 0;
+            const radius = (level * (width / 2 - 40)) + 20;
             const x = centerX + Math.cos(angle) * radius;
             const y = centerY + Math.sin(angle) * radius;
 
+            // Safety check for coordinates
+            if (isNaN(x) || isNaN(y) || !isFinite(x) || !isFinite(y)) return;
+
             // Gradient for node
-            const gradient = ctx.createRadialGradient(x, y, 0, x, y, 10);
             const color = node.status === 'done' ? '#34d399' : 
                           node.status === 'learning' ? '#3b82f6' : 
                           node.status === 'struggling' ? '#ef4444' : '#6b7280';
             
-            gradient.addColorStop(0, color);
-            gradient.addColorStop(1, 'transparent');
-
-            ctx.fillStyle = gradient;
+            ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(x, y, 15, 0, Math.PI * 2);
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
             ctx.fill();
 
             // Label
-            ctx.fillStyle = '#111';
-            ctx.font = '700 10px Inter, sans-serif';
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 11px Inter, system-ui, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(node.label, x, y + 25);
+            ctx.fillText(node.label, x, y + 22);
         });
 
         // Connect nodes to center
         ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(59, 130, 246, 0.1)';
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.15)';
         data.forEach((node, i) => {
             const angle = i * angleStep;
-            const radius = (node.level * (width / 2 - 40)) + 20;
+            const level = (node.level !== undefined && !isNaN(node.level) && isFinite(node.level)) ? node.level : 0;
+            const radius = (level * (width / 2 - 40)) + 20;
             const x = centerX + Math.cos(angle) * radius;
             const y = centerY + Math.sin(angle) * radius;
             
+            if (isNaN(x) || isNaN(y) || !isFinite(x) || !isFinite(y)) return;
+
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
             ctx.lineTo(x, y);

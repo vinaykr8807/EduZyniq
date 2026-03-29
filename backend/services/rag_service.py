@@ -30,28 +30,42 @@ def get_search_results(query: str, max_results: int = 5) -> list[str]:
 
 def scrape_pages(urls: list[str]) -> str:
     combined_text = ""
+    # Try trafilatura direct fetch first (no browser needed)
+    for url in urls:
+        try:
+            downloaded = trafilatura.fetch_url(url)
+            if downloaded:
+                text = trafilatura.extract(downloaded)
+                if text:
+                    print(f"Scraping: {url}")
+                    combined_text += f"\n\nSource: {url}\n{text[:2000]}"
+        except Exception as e:
+            print(f"Error scraping {url}: {e}")
+    
+    if combined_text:
+        return combined_text
+
+    # Fallback to Playwright if trafilatura got nothing
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+            context = browser.new_context(user_agent="Mozilla/5.0")
             page = context.new_page()
-            page.set_default_timeout(10000)
-            
+            page.set_default_timeout(8000)
             for url in urls:
                 try:
-                    print(f"Scraping: {url}")
                     page.goto(url)
                     html = page.content()
                     text = trafilatura.extract(html)
                     if text:
-                        combined_text += f"\n\nSource: {url}\n{text}"
+                        print(f"Scraping: {url} (via Playwright)")
+                        combined_text += f"\n\nSource: {url}\n{text[:2000]}"
                 except Exception as e:
                     print(f"Error scraping {url}: {e}")
-            
             browser.close()
     except Exception as e:
-        print(f"Playwright error: {e}")
-    
+        print(f"Playwright error (non-fatal): {e}")
+
     return combined_text
 
 def chunk_text(text: str, chunk_size: int = 500) -> list[str]:
@@ -94,13 +108,24 @@ def retrieve_context(query: str, combined_text: str, top_k: int = 4) -> str:
         return ""
 
 def generate_rag_context(topic: str, subtopic: str, domain: str) -> str:
+    import concurrent.futures
     query = f"{subtopic} in {topic} for {domain} architecture detailed explanation"
+    try:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(_fetch_rag_context, query)
+            return future.result(timeout=15)  # Hard 15s cap so it never blocks Groq
+    except Exception as e:
+        print(f"RAG context timed out or failed: {e}")
+        return ""
+
+def _fetch_rag_context(query: str) -> str:
+    print("\n  [1/7] Web search…")
     urls = get_search_results(query, max_results=5)
     if not urls:
         return ""
     
+    print("  [2/7] Scraping pages…")
     scraped_text = scrape_pages(urls)
     
-    # Retrieve relevant parts
-    relevant_context = retrieve_context(query, scraped_text, top_k=5)
-    return relevant_context
+    print("  [3/7] RAG vector retrieval…")
+    return retrieve_context(query, scraped_text, top_k=5)

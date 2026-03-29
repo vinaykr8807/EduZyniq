@@ -12,6 +12,7 @@ from auth_service import get_password_hash, verify_password, create_access_token
 from supabase_client import supabase
 from datetime import datetime, timezone
 from assistants.interview_coach import analyze_resume_deep
+from assistants.ats_coach import calculate_ats_score
 from assistants.quiz_master import generate_dynamic_quiz, generate_quiz_feedback
 from assistants.coding_mentor import analyze_code_deep
 from services.pdf_generator import generate_roadmap_pdf
@@ -19,7 +20,7 @@ from services.career_pathfinder import generate_career_report
 from services.teacher_service import explain_subtopic, generate_topic_notes_pdf, get_market_skills, get_pro_coach_beginner_guide
 from services.historical_market_data import historical_service, risk_service
 from services.notification_service import notification_service
-from services.mock_interview_service import build_mock_plan, generate_mock_question, evaluate_mock_answer
+from services.mock_interview_service import build_mock_plan, generate_mock_question, evaluate_mock_answer, evaluate_coding_answer, run_code_against_tests, save_mock_session
 
 app = FastAPI()
 
@@ -30,6 +31,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+def read_root():
+    return {
+        "message": "Welcome to Edunovas AI Backend",
+        "status": "Online",
+        "documentation": "/docs",
+        "health": "/health"
+    }
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return {"message": "No favicon available"}
 
 
 def _sanitize_filename(filename: str) -> str:
@@ -357,6 +371,7 @@ class InterviewSessionModel(BaseModel):
     missing_skills: List[str] = []
     market_skills: List[str] = []
     strong_domains: List[str] = []
+    ats_score: Optional[dict] = None
 
 @app.post("/save-teacher-progress")
 def save_teacher_progress(data: TeacherProgressModel):
@@ -411,7 +426,8 @@ def save_interview_session(data: InterviewSessionModel):
         'matched_skills': data.matched_skills,
         'missing_skills': data.missing_skills,
         'market_skills': data.market_skills,
-        'strong_domains': data.strong_domains
+        'strong_domains': data.strong_domains,
+        'ats_score': data.ats_score or {}
     }
     try:
         supabase.table('interview_sessions').insert(record).execute()
@@ -575,6 +591,14 @@ async def analyze_resume_endpoint(
         return {"error": error}
     analysis = analyze_resume_deep(text, role, level)
     analysis["source_resume_path"] = source_path
+    
+    # 🧬 Dynamic ATS Scoring Feature
+    try:
+        ats_data = calculate_ats_score(text, role)
+        analysis["ats_score"] = ats_data
+    except Exception as e:
+        print(f"ATS Integration Error: {e}")
+        
     return analysis
 
 
@@ -977,11 +1001,12 @@ class MockInterviewPlanReq(BaseModel):
     role: str
     domain: str
     extracted_skills: List[str]
+    user_email: Optional[str] = None
 
 @app.post("/coach/mock-interview/plan")
 def mock_interview_plan(req: MockInterviewPlanReq):
-    plan = build_mock_plan(req.role, req.domain, req.extracted_skills)
-    return {"plan": plan, "difficulty": "Medium", "questions": []}
+    plan = build_mock_plan(req.role, req.domain, req.extracted_skills, req.user_email)
+    return {"plan": plan, "difficulty": "Easy", "questions": []}
 
 class MockInterviewEvalReq(BaseModel):
     role: str
@@ -1000,11 +1025,52 @@ class MockInterviewQuestionReq(BaseModel):
     plan_item: dict
     asked_questions: List[str]
     difficulty: str
+    user_email: Optional[str] = None
 
 @app.post("/coach/mock-interview/question")
 def mock_interview_question(req: MockInterviewQuestionReq):
-    q = generate_mock_question(req.role, req.domain, req.plan_item, req.asked_questions, req.difficulty)
+    q = generate_mock_question(req.role, req.domain, req.plan_item, req.asked_questions, req.difficulty, req.user_email)
     return q
+
+class MockCodingEvalReq(BaseModel):
+    role: str
+    domain: str
+    question: str
+    approach_text: str
+    code: str
+    language: str
+    test_cases: List[dict] = []
+
+@app.post("/coach/mock-interview/evaluate-code")
+def mock_evaluate_code(req: MockCodingEvalReq):
+    """Run user code against test cases and get AI feedback."""
+    return evaluate_coding_answer(
+        req.question, req.approach_text, req.code,
+        req.language, req.test_cases, req.role, req.domain
+    )
+
+class MockRunTestsReq(BaseModel):
+    code: str
+    language: str
+    test_cases: List[dict]
+
+@app.post("/coach/mock-interview/run-tests")
+def mock_run_tests(req: MockRunTestsReq):
+    """Execute code against test cases only (no AI feedback)."""
+    return run_code_against_tests(req.code, req.language, req.test_cases)
+
+class MockSaveSessionReq(BaseModel):
+    user_email: str
+    role: str
+    domain: str
+    language: str
+    evaluations: List[dict]
+
+@app.post("/coach/mock-interview/save-session")
+def mock_save_session(req: MockSaveSessionReq):
+    """Persist mock session for adaptive learning in future sessions."""
+    save_mock_session(req.user_email, req.role, req.domain, req.language, req.evaluations)
+    return {"success": True}
 
 @app.post("/teacher/explain")
 def teacher_explain(req: TeacherExplainRequest):
@@ -1059,10 +1125,16 @@ def teacher_generate_notes(req: TeacherExplainRequest):
                     file=pdf_bytes,
                     file_options={"content-type": "application/pdf", "upsert": "true"}
                 )
-                # Also record the note path in teacher_progress metadata
-                supabase.table('teacher_progress').update({
-                    'notes_path': storage_path
-                }).eq('user_id', user_id).eq('domain', req.domain).eq('milestone_title', req.subtopic).execute()
+                try:
+                    # Also record the note path in teacher_progress metadata
+                    supabase.table('teacher_progress').update({
+                        'notes_path': storage_path
+                    }).eq('user_id', user_id).eq('domain', req.domain).eq('milestone_title', req.subtopic).execute()
+                    print(f"Notes metadata updated: {storage_path}")
+                except Exception as db_err:
+                    # Optional column 'notes_path' might be missing - log and continue skip
+                    print(f"Skip teacher_progress metadata update (column may be missing): {db_err}")
+                
                 print(f"Notes saved to storage: {storage_path}")
         except Exception as e:
             print(f"Notes storage upload error: {e}")

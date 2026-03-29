@@ -34,8 +34,8 @@ export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any
                                 <span style={{ fontSize: '1.2rem' }}>🎯</span>
                             </div>
                             <h3 style={{ fontSize: '1.8rem', fontWeight: 900 }}>{stats?.quiz_accuracy || 0}%</h3>
-                            <div style={{ height: '4px', background: 'rgba(52, 160, 90, 0.10)', borderRadius: '2px' }}>
-                                <div style={{ height: '100%', width: `${stats?.quiz_accuracy || 0}%`, background: 'var(--accent-blue)', borderRadius: '2px' }}></div>
+                            <div style={{ height: '5px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${stats?.quiz_accuracy || 0}%`, background: 'var(--accent-blue)', borderRadius: '3px' }}></div>
                             </div>
                         </div>
                         <div className="glass-card flex-col gap-md" style={{ padding: '1.25rem', border: '1px solid var(--accent-green)' }}>
@@ -44,8 +44,8 @@ export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any
                                 <span style={{ fontSize: '1.2rem' }}>👔</span>
                             </div>
                             <h3 style={{ fontSize: '1.8rem', fontWeight: 900 }}>{stats?.interview_score || 0}%</h3>
-                            <div style={{ height: '4px', background: 'rgba(52, 160, 90, 0.10)', borderRadius: '2px' }}>
-                                <div style={{ height: '100%', width: `${stats?.interview_score || 0}%`, background: 'var(--accent-green)', borderRadius: '2px' }}></div>
+                            <div style={{ height: '5px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${stats?.interview_score || 0}%`, background: 'var(--accent-green)', borderRadius: '3px' }}></div>
                             </div>
                         </div>
                         <div className="glass-card flex-col gap-md" style={{ padding: '1.25rem', border: '1px solid var(--accent-red)' }}>
@@ -54,8 +54,8 @@ export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any
                                 <span style={{ fontSize: '1.2rem' }}>⚡</span>
                             </div>
                             <h3 style={{ fontSize: '1.8rem', fontWeight: 900 }}>{stats?.code_optimization || 100}%</h3>
-                            <div style={{ height: '4px', background: 'rgba(52, 160, 90, 0.10)', borderRadius: '2px' }}>
-                                <div style={{ height: '100%', width: `${stats?.code_optimization || 100}%`, background: 'var(--accent-red)', borderRadius: '2px' }}></div>
+                            <div style={{ height: '5px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${stats?.code_optimization || 100}%`, background: 'var(--accent-red)', borderRadius: '3px' }}></div>
                             </div>
                         </div>
                     </div>

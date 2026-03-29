@@ -1,6 +1,145 @@
 import { useState, useEffect } from 'react';
 import { CURRICULUM_DATA, type Roadmap } from '../../data/curriculumData';
 import { playNotificationSound } from '../../utils/audio';
+import { InlineMath, BlockMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
+
+const getYouTubeVideoId = (url: string) => {
+    const patterns = [
+        /youtube\.com\/embed\/([^?&/]+)/,
+        /youtube\.com\/watch\?v=([^?&/]+)/,
+        /youtu\.be\/([^?&/]+)/,
+    ];
+
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match?.[1]) return match[1];
+    }
+
+    return null;
+};
+
+const getYouTubeWatchUrl = (url: string) => {
+    const videoId = getYouTubeVideoId(url);
+    return videoId ? `https://www.youtube.com/watch?v=${videoId}` : url;
+};
+
+const normalizeLatexText = (text: string) => {
+    if (!text) return text;
+
+    return text
+        .replace(/\u0008/g, '\\b')
+        .replace(/\u000c/g, '\\f')
+        .replace(/(^|[^\\])begin\{/g, '$1\\begin{')
+        .replace(/(^|[^\\])end\{/g, '$1\\end{')
+        .replace(/(^|[^\\])frac\{/g, '$1\\frac{')
+        .replace(/(^|[^\\])text\{/g, '$1\\text{')
+        .replace(/(^|[^\\])cdot\b/g, '$1\\cdot')
+        .replace(/(^|[^\\])times\b/g, '$1\\times')
+        .replace(/(^|[^\\])rightarrow\b/g, '$1\\rightarrow')
+        .replace(/(^|[^\\])left\b/g, '$1\\left')
+        .replace(/(^|[^\\])right\b/g, '$1\\right');
+};
+
+const YouTubeEmbed = ({ url }: { url: string }) => {
+    const videoId = getYouTubeVideoId(url);
+    const watchUrl = getYouTubeWatchUrl(url);
+    const thumbnailUrl = videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            {thumbnailUrl && (
+                <a
+                    href={watchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                        position: 'relative',
+                        display: 'block',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        lineHeight: 0
+                    }}
+                >
+                    <img
+                        src={thumbnailUrl}
+                        alt="YouTube video thumbnail"
+                        style={{ width: '100%', height: '250px', objectFit: 'cover', display: 'block' }}
+                    />
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'linear-gradient(180deg, rgba(6, 10, 18, 0.05) 0%, rgba(6, 10, 18, 0.78) 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '1rem'
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: '68px',
+                                height: '48px',
+                                borderRadius: '14px',
+                                background: 'rgba(255, 0, 0, 0.92)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 14px 30px rgba(0, 0, 0, 0.28)'
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: 0,
+                                    height: 0,
+                                    borderTop: '10px solid transparent',
+                                    borderBottom: '10px solid transparent',
+                                    borderLeft: '16px solid white',
+                                    marginLeft: '4px'
+                                }}
+                            />
+                        </div>
+                    </div>
+                </a>
+            )}
+
+            <div
+                style={{
+                    borderRadius: '8px',
+                    border: '1px solid rgba(100,130,255,0.16)',
+                    background: 'rgba(100,130,255,0.06)',
+                    padding: '0.85rem'
+                }}
+            >
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                    This YouTube video may not play inside the app if embedding is disabled by the owner.
+                </p>
+                <a
+                    href={watchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginTop: '0.65rem',
+                        padding: '0.55rem 0.9rem',
+                        borderRadius: '999px',
+                        background: '#ff0033',
+                        color: '#fff',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        textDecoration: 'none',
+                        letterSpacing: '0.02em'
+                    }}
+                >
+                    Watch on YouTube
+                </a>
+            </div>
+        </div>
+    );
+};
 
 const getUser = () => JSON.parse(localStorage.getItem('edunovas_user') || '{}');
 
@@ -28,9 +167,10 @@ const DiagramBlock = ({ engine, code }: { engine: string, code: string }) => {
             setLoading(true);
             setError(null);
             try {
-                // Use Kroki API for robust, high-quality rendering
+                // Use Kroki API with a specific D2 theme if possible, or handle via CSS
                 const response = await fetch(`https://kroki.io/${engine}/svg`, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
                     body: code,
                 });
 
@@ -54,29 +194,32 @@ const DiagramBlock = ({ engine, code }: { engine: string, code: string }) => {
 
     if (error) {
         return (
-            <div style={{ color: '#f87171', background: 'rgba(239,68,68,0.05)', padding: '1rem', borderRadius: '8px', border: '1px dashed rgba(239,68,68,0.3)', fontSize: '0.8rem' }}>
-                <p style={{ fontWeight: 800, marginBottom: '0.5rem', color: '#b91c1c' }}>⚠️ Diagram Error</p>
-                <code style={{ fontSize: '0.7rem', opacity: 0.8 }}>{error}</code>
+            <div className="diagram-error-card">
+                <p className="error-title">⚠️ Architecture Compilation Error</p>
+                <code className="error-details">{error}</code>
+                <div className="error-raw-code">
+                    <p style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>RAW SOURCE (FIXED):</p>
+                    <pre style={{ margin: 0, padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', overflow: 'auto' }}>{code}</pre>
+                </div>
             </div>
         );
     }
 
     return (
-        <div style={{ background: '#ffffff', padding: '1.25rem', borderRadius: '12px', boxShadow: 'inset 0 0 20px rgba(0,0,0,0.01)', border: '1px solid rgba(100,130,255,0.05)', display: 'flex', justifyContent: 'center', width: '100%', minHeight: '80px', alignItems: 'center', position: 'relative' }}>
+        <div className="diagram-canvas">
             {loading && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.7)', zIndex: 1, borderRadius: '12px', gap: '8px' }}>
-                    <div className="mermaid-loader" />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>Rendering {engine.toUpperCase()}...</span>
+                <div className="diagram-loading-overlay">
+                    <div className="spinner" />
+                    <span>Architecting {engine.toUpperCase()}...</span>
                 </div>
             )}
             {svg ? (
                 <div 
                     dangerouslySetInnerHTML={{ __html: svg }} 
-                    style={{ width: '100%', display: 'flex', justifyContent: 'center', overflowX: 'auto' }} 
                     className="diagram-svg-container"
                 />
             ) : !loading && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Waiting for content...</span>
+                <span className="waiting-text">Waiting for blueprints...</span>
             )}
         </div>
     );
@@ -358,22 +501,28 @@ export const Teacher = () => {
 
     // Render inline markdown: **bold**, `code`, mixed text
     const renderInline = (text: string) => {
+        if (!text) return null;
+        const normalizedText = normalizeLatexText(text);
         const parts: React.ReactNode[] = [];
-        // Split on **bold** and `code`
-        const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+        // Split on **bold**, `code`, $latex$, and \(inline math\)
+        const regex = /(\*\*[^*]+\*\*|`[^`]+`|\$[^\$]+\$|\\\([^\)]+\\\))/g;
         let last = 0, m;
         let key = 0;
-        while ((m = regex.exec(text)) !== null) {
-            if (m.index > last) parts.push(<span key={key++}>{text.slice(last, m.index)}</span>);
+        while ((m = regex.exec(normalizedText)) !== null) {
+            if (m.index > last) parts.push(<span key={key++}>{normalizedText.slice(last, m.index)}</span>);
             const token = m[0];
             if (token.startsWith('**')) {
                 parts.push(<strong key={key++} style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{token.slice(2, -2)}</strong>);
-            } else {
+            } else if (token.startsWith('`')) {
                 parts.push(<code key={key++} style={{ background: 'rgba(100,130,255,0.12)', color: 'var(--primary-700)', padding: '1px 5px', borderRadius: '4px', fontSize: '0.85em', fontFamily: 'monospace' }}>{token.slice(1, -1)}</code>);
+            } else if (token.startsWith('$')) {
+                parts.push(<InlineMath key={key++} math={token.slice(1, -1)} />);
+            } else if (token.startsWith('\\(')) {
+                parts.push(<InlineMath key={key++} math={token.slice(2, -2)} />);
             }
             last = m.index + token.length;
         }
-        if (last < text.length) parts.push(<span key={key++}>{text.slice(last)}</span>);
+        if (last < normalizedText.length) parts.push(<span key={key++}>{normalizedText.slice(last)}</span>);
         return parts;
     };
 
@@ -405,6 +554,49 @@ export const Teacher = () => {
                         <DiagramBlock engine={engine} code={diagramCode} />
                     </div>
                 );
+                i++; continue;
+            }
+
+            // --- Block Math: $$ ... $$ or \begin{env} ... \end{env} ---
+            if (line.trim().startsWith('$$') || line.trim().startsWith('\\begin{')) {
+                let mathContent = "";
+                
+                if (line.trim().startsWith('$$')) {
+                    mathContent = line.trim().slice(2);
+                    if (mathContent.endsWith('$$')) {
+                        mathContent = mathContent.slice(0, -2);
+                    } else {
+                        const mathLines: string[] = [mathContent];
+                        i++;
+                        while (i < lines.length && !lines[i].trim().endsWith('$$')) {
+                            mathLines.push(lines[i]);
+                            i++;
+                        }
+                        if (i < lines.length) {
+                             const lastLine = lines[i].trim();
+                             mathLines.push(lastLine.slice(0, -2));
+                        }
+                        mathContent = mathLines.join('\n');
+                    }
+                } else {
+                    // Start of a \begin{...} environment
+                    const mathLines: string[] = [line.trim()];
+                    i++;
+                    while (i < lines.length && !lines[i].includes('\\end{')) {
+                        mathLines.push(lines[i]);
+                        i++;
+                    }
+                    if (i < lines.length) mathLines.push(lines[i]);
+                    mathContent = mathLines.join('\n');
+                }
+                
+                if (mathContent.trim()) {
+                    elements.push(
+                        <div key={`math-${i}`} className="math-block" style={{ margin: '1.5rem 0', textAlign: 'center', background: 'rgba(100,130,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
+                            <BlockMath math={mathContent} />
+                        </div>
+                    );
+                }
                 i++; continue;
             }
 
@@ -652,7 +844,14 @@ export const Teacher = () => {
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '1.5rem', alignItems: 'start' }} className="teacher-grid">
+            <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '260px minmax(0, 940px)', 
+                gap: '1.5rem', 
+                alignItems: 'start', 
+                justifyContent: 'center',
+                margin: '0 auto'
+            }} className="teacher-grid">
                 {/* Left: Phase + Milestone Nav */}
                 <div className="flex-col gap-md" style={{ position: 'sticky', top: '110px' }}>
                     {selectedRoadmap.phases.map((ph, pIdx) => (
@@ -753,8 +952,8 @@ export const Teacher = () => {
                         </div>
 
                         {explanation?.image_url && (
-                             <div className="flex gap-md mb-lg" style={{ flexWrap: 'wrap' }}>
-                                 <div className="glass-card flex-1" style={{ padding: '0.4rem', minWidth: '300px' }}>
+                             <div className="flex gap-md mb-lg justify-center" style={{ flexWrap: 'wrap' }}>
+                                 <div className="glass-card" style={{ padding: '0.4rem', width: '400px', flexShrink: 0 }}>
                                      <img 
                                         src={explanation.image_url} 
                                         alt="Visual Context" 
@@ -762,15 +961,10 @@ export const Teacher = () => {
                                      />
                                      <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '4px', fontWeight: 700 }}>TECHNICAL REFERENCE IMAGE</p>
                                  </div>
-                                 {explanation.video_url && (
-                                     <div className="glass-card flex-1" style={{ padding: '0.4rem', minWidth: '300px' }}>
-                                         {explanation.video_url.includes('youtube.com/embed') ? (
-                                             <iframe 
-                                                src={explanation.video_url} 
-                                                style={{ width: '100%', height: '250px', borderRadius: '8px', border: 'none' }} 
-                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                                allowFullScreen
-                                             />
+                                  {explanation.video_url && (
+                                      <div className="glass-card" style={{ padding: '0.4rem', width: '400px', flexShrink: 0 }}>
+                                         {explanation.video_url.includes('youtube.com') || explanation.video_url.includes('youtu.be') ? (
+                                             <YouTubeEmbed url={explanation.video_url} />
                                          ) : (
                                              <video 
                                                 src={explanation.video_url} 
@@ -1063,10 +1257,99 @@ export const Teacher = () => {
 
             <style>{`
                 @keyframes spin { to { transform: rotate(360deg); } }
-                @media (max-width: 900px) {
+                @media (max-width: 1024px) {
                     .teacher-grid { grid-template-columns: 1fr !important; }
                 }
                 .glass-card button:hover { opacity: 0.85; }
+
+                /* Premium "Blueprint" Diagram Styles */
+                .diagram-canvas {
+                    background: #f8fbff; /* Very light tech blue */
+                    padding: 2rem;
+                    border-radius: 12px;
+                    border: 1px solid #d1e3f8;
+                    display: flex;
+                    justify-content: center;
+                    width: 100%;
+                    min-height: 250px;
+                    align-items: center;
+                    position: relative;
+                    overflow: hidden;
+                    box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
+                }
+
+                .diagram-svg-container {
+                    width: 100%;
+                    display: flex;
+                    justify-content: center;
+                    overflow-x: auto;
+                }
+
+                /* Force SVG elements to look like the reference image */
+                .diagram-svg-container svg {
+                    max-width: 100% !important;
+                    height: auto !important;
+                }
+
+                /* This targets D2/Kroki generated SVG paths/rects for that clean blue look */
+                .diagram-svg-container svg rect, 
+                .diagram-svg-container svg path[fill^="rgb(255, 255, 255)"],
+                .diagram-svg-container svg polygon {
+                    stroke: #2563eb !important; /* Blue borders */
+                    stroke-width: 1.5px !important;
+                    fill: #eff6ff !important; /* Light blue fill */
+                }
+
+                .diagram-svg-container svg text {
+                    fill: #1e3a8a !important; /* Deep blue text */
+                    font-weight: 600 !important;
+                    font-family: 'Inter', sans-serif !important;
+                }
+
+                .diagram-svg-container svg path {
+                    stroke: #2563eb !important; /* Blue arrows */
+                }
+
+                .diagram-error-card {
+                    color: #fb7185;
+                    background: rgba(159,18,57,0.05);
+                    padding: 1.25rem;
+                    border-radius: 12px;
+                    border: 1px solid rgba(225,29,72,0.2);
+                    font-size: 0.8rem;
+                }
+
+                .error-title {
+                    font-weight: 800;
+                    margin-bottom: 0.75rem;
+                    color: #e11d48;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+
+                .error-details {
+                    display: block;
+                    padding: 0.75rem;
+                    background: rgba(0,0,0,0.2);
+                    border-radius: 8px;
+                    margin-bottom: 1rem;
+                    font-family: inherit;
+                    line-height: 1.4;
+                }
+
+                .error-raw-code pre {
+                    font-family: 'Fira Code', 'Courier New', monospace;
+                    font-size: 0.7rem;
+                    line-height: 1.5;
+                    color: #94a3b8;
+                }
+
+                .waiting-text {
+                    font-size: 0.8rem;
+                    color: var(--text-muted);
+                    font-style: italic;
+                }
             `}</style>
         </div>
     );

@@ -14,6 +14,7 @@
   --accent-green: hsl(150, 65%, 45%);
   --accent-orange: hsl(30, 90%, 55%);
   --accent-pink: hsl(330, 75%, 60%);
+  --accent-red: hsl(0, 85%, 60%);
 
   /* ── Clean Light Theme ── */
   --bg-primary: hsl(0, 0%, 100%);

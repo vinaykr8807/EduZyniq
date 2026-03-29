@@ -99,9 +99,8 @@ export const Assistant = () => {
     };
 
     return (
-        <div className="fade-in" style={{ padding: '100px 0 var(--spacing-2xl)', minHeight: '100vh' }}>
-            <div className="container">
-                {showProfileDialog && (
+        <div className="fade-in" style={{ padding: '40px 0 var(--spacing-2xl)', minHeight: '100vh' }}>
+            {showProfileDialog && (
                     <ProfileDialog
                         title={profile ? "Update Your Profile" : "AI Onboarding: Core Details"}
                         onSave={handleProfileSave}
@@ -125,7 +124,6 @@ export const Assistant = () => {
                 </div>
 
                 {renderContent()}
-            </div>
 
             <style>{`
                 .hover-lift { transition: all 0.3s ease; }

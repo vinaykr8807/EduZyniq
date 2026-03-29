@@ -50,13 +50,19 @@ def generate_dynamic_quiz(subject: str, topic: str, difficulty: str, mode: str =
     - Format: JSON object with "quiz" key containing a list.
     - Each question must have: 
         "question": string (conceptual prompt),
-        "options": list of 4 strings (REQUIRED for 'mcq', 'true_false', 'code_completion', and 'image_based'),
+        "options": list of 4 strings (REQUIRED),
         "answer": string (exactly matches one option),
         "explanation": string,
-        "topic_tag": string,
+        "topic_tag": string (CHOOSE ONE: 'Theory', 'Logic', 'Systems', 'Implementation'),
         "type": string ('mcq', 'true_false', 'matching', 'code_completion', 'image_based'),
-        "matching_pairs": JSON object with key-value pairs (ONLY if type is 'matching'),
+        "matching_pairs": JSON object (ONLY if type is 'matching'),
         "visual_query": string (if relevant)
+    
+    For topic_tag:
+    - 'Theory': Historical context, definitions, and high-level concepts.
+    - 'Logic': Algorithmic snippets, problem-solving, and logic flows.
+    - 'Systems': Architecture, scaling, infrastructure, and multi-component design.
+    - 'Implementation': Code syntax, specific library APIs, and deployment steps.
     
     For 'matching' type:
     - Set "question" to "Match the following terms correctly."
@@ -114,36 +120,68 @@ def generate_quiz_feedback(results: list, subject: str, topic: str):
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key: return {"gaps": ["General practice needed"], "plan": ["Review foundational concepts"]}
     
+    # Pre-calculate raw performance for mapping
+    total = len(results)
+    correct_count = sum(1 for r in results if r.get('is_correct'))
+    overall_score = (correct_count / total) if total > 0 else 0
+    
+    # Category mapping hint
+    categories = {"Theory": 0, "Logic": 0, "Systems": 0, "Implementation": 0}
+    cat_counts = {"Theory": 0, "Logic": 0, "Systems": 0, "Implementation": 0}
+    
+    for r in results:
+        tag = r.get('topic_tag', '').lower()
+        # Map tag to one of the 4 buckets
+        target = "Theory"
+        if any(x in tag for x in ['code', 'syntax', 'impl', 'deploy', 'writing', 'completion']): target = "Implementation"
+        elif any(x in tag for x in ['logic', 'problem', 'algorithm', 'math', 'reasoning']): target = "Logic"
+        elif any(x in tag for x in ['system', 'arch', 'design', 'scaling', 'infra']): target = "Systems"
+        
+        cat_counts[target] += 1
+        if r.get('is_correct'):
+            categories[target] += 1
+            
+    # Calculate percentages per category
+    cat_mastery = {}
+    for k, v in categories.items():
+        count = cat_counts[k]
+        cat_mastery[k] = (v / count) if count > 0 else overall_score
+
     client = Groq(api_key=api_key)
     prompt = f"""
     Analyze these {subject} ({topic}) quiz results for a student.
-    RESULTS: {json.dumps(results)}
+    RAW PERFORMANCE METRICS (Use these as the base for the knowledge_graph):
+    {json.dumps(cat_mastery)}
     
-    Provide a critical and deep technical analysis:
-    1. "gaps": A list of specific concepts the student failed to understand. DO NOT leave this empty if there are incorrect answers. For every "is_correct": false, identify the specific concept gap.
-    2. "plan": A list of 3 concrete, actionable, and technical steps to improve.
-    3. "knowledge_graph": A list of 4 objects for visual analytics. Adjust "level" (0-1) and "status" based on whether related questions were correct.
+    RESULTS DATA: {json.dumps(results)}
+    
+    INSTRUCTIONS:
+    1. "gaps": Detailed technical explanation for every question marked 'is_correct': false.
+    2. "plan": 3 actionable, non-generic technical steps for improvement.
+    3. "knowledge_graph": 4 nodes matching these exact IDs and Labels.
+       Adjust "level" (0.0 to 1.0) and "status" based on the RAW PERFORMANCE METRICS provided above.
+       - status: "done" (if level > 0.8), "learning" (if level 0.4-0.8), "struggling" (if level < 0.4)
+       
        [
-         {{"id": "1", "label": "Theory", "level": float, "status": "done"|"learning"|"struggling"}},
-         {{"id": "2", "label": "Logic", "level": float, "status": "done"|"learning"|"struggling"}},
-         {{"id": "3", "label": "Systems", "level": float, "status": "done"|"learning"|"struggling"}},
-         {{"id": "4", "label": "Implementation", "level": float, "status": "done"|"learning"|"struggling"}}
+         {{"id": "1", "label": "Theory", "level": {cat_mastery['Theory']}, "status": "..."}},
+         {{"id": "2", "label": "Logic", "level": {cat_mastery['Logic']}, "status": "..."}},
+         {{"id": "3", "label": "Systems", "level": {cat_mastery['Systems']}, "status": "..."}},
+         {{"id": "4", "label": "Implementation", "level": {cat_mastery['Implementation']}, "status": "..."}}
        ]
     
-    Return ONLY a JSON object with "gaps", "plan", and "knowledge_graph".
-    If the student has mistakes, ensure the gaps reflect the technical depth of the error.
+    Return ONLY a JSON object. Ensure the visual analytics (knowledge_graph) perfectly align with the metrics.
     """
     
     try:
         res = client.chat.completions.create(
-            messages=[{"role": "system", "content": "You are a critical technical mentor. Never provide generic feedback. Always analyze specific mistakes."}, {"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "You are a master technical mentor. Your job is to translate raw quiz data into a visual mastery graph and actionable plan."},
+                {"role": "user", "content": prompt}
+            ],
             model="llama-3.3-70b-versatile",
             response_format={"type": "json_object"}
         )
         data = json.loads(res.choices[0].message.content)
-        # Final safety check
-        if not data.get("gaps") and any(not r.get("is_correct") for r in results):
-             data["gaps"] = ["Conceptual architectural foundational gaps identified from incorrect responses."]
         return data
     except Exception as e:
         print(f"Feedback AI Error: {e}")

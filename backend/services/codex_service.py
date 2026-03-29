@@ -379,9 +379,9 @@ Code:
 {ref_context}
 
 TASK:
-1. Fix all bugs and edge cases
-2. Optimize for performance (time + memory)  
-3. Apply clean code principles (naming, structure)
+1. Fix all bugs and fundamental edge cases
+2. Optimize for performance: Ensure lower or equal time/memory complexity. Avoid over-engineering that increases constant-time overhead.
+3. Apply clean code principles (naming, structure) without sacrificing execution speed.
 4. Add concise docstrings/comments
 
 Return ONLY a JSON object:
