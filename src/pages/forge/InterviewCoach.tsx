@@ -1215,7 +1215,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                             <span className="badge" style={{ fontSize: '0.68rem', background: ev.type === 'coding' ? 'rgba(245,158,11,0.15)' : 'rgba(100,130,255,0.1)', color: ev.type === 'coding' ? '#f59e0b' : 'var(--primary-400)', flexShrink: 0 }}>
                                                                 {ev.type === 'coding' ? '💻 Coding' : '💬 Verbal'}
                                                             </span>
-                                                            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                                 Q{i+1}: {ev.question?.slice(0,70)}{ev.question?.length > 70 ? '…' : ''}
                                                             </h4>
                                                         </div>
@@ -1226,17 +1226,17 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
                                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
                                                         <div style={{ background: 'rgba(100,130,255,0.05)', padding: '0.85rem', borderRadius: '8px' }}>
-                                                            <strong style={{ color: 'var(--primary-500)', fontSize: '0.78rem' }}>✅ Strengths</strong>
-                                                            <p style={{ fontSize: '0.82rem', marginTop: '0.4rem' }}>{ev.strengths}</p>
+                                                            <strong style={{ color: 'var(--primary-400)', fontSize: '0.8rem', letterSpacing: '0.5px' }}>✅ Strengths</strong>
+                                                            <p style={{ fontSize: '0.82rem', marginTop: '0.4rem', color: '#cbd5e1', lineHeight: 1.5 }}>{ev.strengths}</p>
                                                         </div>
                                                         <div style={{ background: 'rgba(239,68,68,0.05)', padding: '0.85rem', borderRadius: '8px' }}>
-                                                            <strong style={{ color: 'var(--accent-red)', fontSize: '0.78rem' }}>⚠️ Weaknesses</strong>
-                                                            <p style={{ fontSize: '0.82rem', marginTop: '0.4rem' }}>{ev.weaknesses}</p>
+                                                            <strong style={{ color: '#f87171', fontSize: '0.8rem', letterSpacing: '0.5px' }}>⚠️ Weaknesses</strong>
+                                                            <p style={{ fontSize: '0.82rem', marginTop: '0.4rem', color: '#cbd5e1', lineHeight: 1.5 }}>{ev.weaknesses}</p>
                                                         </div>
                                                     </div>
                                                     <div style={{ background: 'rgba(56,183,248,0.04)', padding: '0.85rem', borderRadius: '8px' }}>
-                                                        <strong style={{ color: 'var(--accent-blue)', fontSize: '0.78rem' }}>�� {ev.type === 'coding' ? 'Optimal Solution' : 'Model Answer'}</strong>
-                                                        <p style={{ fontSize: '0.82rem', marginTop: '0.4rem', fontStyle: 'italic', color: 'var(--text-secondary)' }}>"{ev.improved_answer || ev.optimal_solution}"</p>
+                                                        <strong style={{ color: 'var(--accent-blue)', fontSize: '0.8rem', letterSpacing: '0.5px' }}>🏆 {ev.type === 'coding' ? 'Optimal Solution' : 'Model Answer'}</strong>
+                                                        <p style={{ fontSize: '0.82rem', marginTop: '0.4rem', fontStyle: 'italic', color: '#94a3b8', lineHeight: 1.5 }}>"{ev.improved_answer || ev.optimal_solution}"</p>
                                                     </div>
                                                 </div>
                                             ))}
