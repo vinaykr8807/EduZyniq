@@ -950,7 +950,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                         <div className="flex-col gap-sm">
                                                             <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>EXAMPLES:</p>
                                                             {currentQuestion.examples.map((ex: any, i: number) => (
-                                                                <div key={i} style={{ background: 'rgba(0,0,0,0.5)', padding: '0.85rem 1rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.82rem', color: '#e2e8f0' }}>
+                                                                <div key={i} style={{ background: 'rgba(15, 23, 42, 0.95)', padding: '1rem 1.25rem', borderRadius: '12px', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.85rem', color: '#f1f5f9', border: '1px solid rgba(100,130,255,0.15)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                                                                     <span style={{ color: '#60a5fa', fontWeight: 700 }}>Input:</span> {ex.input} &nbsp;
                                                                     <span style={{ color: '#10b981', fontWeight: 700 }}>Output:</span> {ex.output}
                                                                     {ex.explanation && <span style={{ color: '#94a3b8', marginLeft: '0.5rem' }}> — {ex.explanation}</span>}
@@ -1003,7 +1003,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                             </div>
                                                             {/* Function signature hint */}
                                                             {currentQuestion.function_signature?.[codingLanguage] && !userCode && (
-                                                                <div style={{ background: 'rgba(0,0,0,0.5)', padding: '0.85rem 1rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.8rem', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                                <div style={{ background: 'rgba(15, 23, 42, 0.95)', padding: '1.25rem', borderRadius: '12px', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.85rem', color: '#f1f5f9', border: '1px solid rgba(100,130,255,0.2)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
                                                                     <p style={{ fontSize: '0.68rem', color: 'var(--primary-400)', marginBottom: '0.4rem', fontWeight: 800 }}>STARTER TEMPLATE:</p>
                                                                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#cbd5e1' }}>{currentQuestion.function_signature[codingLanguage]}</pre>
                                                                     <button onClick={() => setUserCode(currentQuestion.function_signature[codingLanguage])}
@@ -1014,7 +1014,12 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                             )}
                                                             <textarea value={userCode} onChange={e => setUserCode(e.target.value)}
                                                                 className="input-field"
-                                                                style={{ minHeight: '250px', padding: '1rem', fontFamily: 'monospace', fontSize: '0.9rem', background: 'rgba(0,0,0,0.4)', lineHeight: 1.6 }}
+                                                                style={{ 
+                                                                    minHeight: '300px', padding: '1.25rem', fontFamily: '"JetBrains Mono", monospace', 
+                                                                    fontSize: '0.95rem', background: 'rgba(15, 23, 42, 0.98)', color: '#f8fafc',
+                                                                    lineHeight: 1.7, border: '1px solid rgba(100,130,255,0.3)', borderRadius: '12px',
+                                                                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
+                                                                }}
                                                                 placeholder={`Write your ${codingLanguage} solution here...`} />
 
                                                             {/* Test Results Preview */}
@@ -1065,9 +1070,9 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                                     { label: 'Approach', val: codingEval.approach_score, color: '#d97706' },
                                                                     { label: 'Code Quality', val: codingEval.code_quality_score, color: '#0891b2' },
                                                                 ].map(({ label, val, color }) => (
-                                                                    <div key={label} style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '10px', textAlign: 'center', border: `1px solid ${color}33` }}>
-                                                                        <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '4px' }}>{label.toUpperCase()}</p>
-                                                                        <p style={{ fontSize: '2rem', fontWeight: 900, color, lineHeight: 1 }}>{val}<span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>/10</span></p>
+                                                                    <div key={label} style={{ background: 'rgba(15, 23, 42, 0.95)', padding: '1.25rem 1rem', borderRadius: '12px', textAlign: 'center', border: `1px solid ${color}`, boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+                                                                        <p style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 800, marginBottom: '6px', letterSpacing: '0.5px' }}>{label.toUpperCase()}</p>
+                                                                        <p style={{ fontSize: '2.2rem', fontWeight: 900, color, lineHeight: 1 }}>{val}<span style={{ fontSize: '1rem', color: '#64748b' }}>/10</span></p>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -1155,9 +1160,13 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                         </div>
                                                         <textarea value={userMockAnswer} onChange={e => setUserMockAnswer(e.target.value)}
                                                             className="input-field"
-                                                            style={{ minHeight: '150px', padding: '1rem',
-                                                                background: isListening ? 'rgba(239,68,68,0.05)' : 'rgba(0,0,0,0.2)',
-                                                                border: isListening ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--glass-border)' }}
+                                                            style={{ 
+                                                                minHeight: '200px', padding: '1.25rem', fontSize: '1.05rem',
+                                                                background: isListening ? 'rgba(239,68,68,0.08)' : 'rgba(15, 23, 42, 0.95)',
+                                                                color: isListening ? '#f87171' : '#f1f5f9',
+                                                                border: isListening ? '2px solid #ef4444' : '1px solid rgba(100,130,255,0.2)',
+                                                                lineHeight: 1.7, borderRadius: '12px', boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.2)'
+                                                            }}
                                                             placeholder="Type your answer here or click 'Speak Answer'... (Tip: Use the STAR method)" />
                                                     </div>
 
@@ -1200,7 +1209,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
                                         <div className="flex-col gap-lg">
                                             {mockEvals.map((ev, i) => (
-                                                <div key={i} style={{ border: '1px solid var(--glass-border)', padding: '1.5rem', borderRadius: '12px', background: 'rgba(255,255,255,0.02)' }}>
+                                                <div key={i} style={{ border: '1px solid rgba(100,130,255,0.15)', padding: '1.75rem', borderRadius: '16px', background: 'rgba(15, 23, 42, 0.95)', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
                                                     <div className="flex justify-between items-center" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                                                         <div className="flex gap-sm items-center flex-wrap" style={{ flex: 1, minWidth: 0 }}>
                                                             <span className="badge" style={{ fontSize: '0.68rem', background: ev.type === 'coding' ? 'rgba(245,158,11,0.15)' : 'rgba(100,130,255,0.1)', color: ev.type === 'coding' ? '#f59e0b' : 'var(--primary-400)', flexShrink: 0 }}>
