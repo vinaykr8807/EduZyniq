@@ -37,25 +37,50 @@ Edunovas combines multiple learning modules in one interface:
 ## System Architecture
 
 ```mermaid
-graph TD
-    User((Student)) <-->|React Dashboard| Frontend[Vite Frontend - Vercel]
-    Frontend <-->|Cloudflare Tunnel| Backend[FastAPI Backend - Local]
+graph LR
+    %% Styles
+    classDef client fill:#0ea5e9,stroke:#0369a1,color:#fff,stroke-width:2px;
+    classDef api fill:#10b981,stroke:#047857,color:#fff,stroke-width:2px;
+    classDef ai fill:#f59e0b,stroke:#b45309,color:#fff,stroke-width:2px;
+    classDef engine fill:#8b5cf6,stroke:#6d28d9,color:#fff,stroke-width:2px;
+    classDef infra fill:#64748b,stroke:#334155,color:#fff,stroke-width:2px;
+
+    %% Nodes
+    User((Student Dashboard)):::client
+    Backend{FastAPI Orchestrator}:::api
     
-    subgraph "AI Core & Agents"
-        Backend -->|Llama 3.3 70B| LLM[Groq AI Engine]
-        Backend -->|Real-time Market| Serper[Serper API]
-        Backend -->|RAG Pipeline| VectorBD[Supabase Vector / FAISS]
+    subgraph "Intelligence Layer"
+        Brain[Llama 3.3 Agentic Brain]:::ai
+        RAG[Personal RAG Context]:::ai
     end
     
-    subgraph "Specialized Services"
-        Backend -->|Sandbox Run| Docker[Local Docker Engine]
-        Backend -->|Notes Gen| PDFGen[ReportLab PDF Engine]
-        Backend -->|Visuals| PexelsWiki[Pexels & Wikipedia API]
+    subgraph "Specialized Engines"
+        Docker[[Docker Code Sandbox]]:::engine
+        Quiz((Adaptive Quiz Master)):::engine
+        Market((Market Insights - Serper)):::engine
+        PDF_Engine((ReportLab PDF Gen)):::engine
     end
     
-    subgraph "Infrastructure"
-        Backend <-->|Auth & SQL| Supabase[Supabase Postgres/Storage]
+    subgraph "Data & Storage"
+        Supabase[(Supabase Postgres & Auth)]:::infra
+        S3[(Supabase Storage - Notes/PDF)]:::infra
     end
+
+    %% Connections
+    User <-->|REST API / Tunnel| Backend
+    Backend <--> Brain
+    Brain <--> RAG
+    
+    Backend --> Docker
+    Backend --> Quiz
+    Backend --> Market
+    Backend --> PDF_Engine
+    
+    Backend <--> Supabase
+    PDF_Engine --> S3
+    
+    %% Direction
+    direction LR
 ```
 
 ### 🎨 Frontend Architecture (React)
