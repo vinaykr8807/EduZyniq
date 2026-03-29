@@ -407,12 +407,12 @@ export const QuizMaster = ({ onComplete }: any) => {
                                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>AI is scanning your errors...</p>
                                     ) : (
                                         <ul style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                            {feedback?.gaps?.map((g: any, i: number) => (
+                                            {Array.isArray(feedback?.gaps) ? feedback.gaps.map((g: any, i: number) => (
                                                 <li key={i} className="flex items-start gap-xs"> 
                                                     <span style={{ color: 'var(--accent-red)', marginTop: '2px' }}>⚠</span> 
                                                     <span>{typeof g === 'string' ? g : (g.explanation || g.question || JSON.stringify(g))}</span>
                                                 </li>
-                                            )) || <li>No major gaps identified</li>}
+                                            )) : <li>No major gaps identified</li>}
                                         </ul>
                                     )}
                                 </div>
@@ -422,12 +422,12 @@ export const QuizMaster = ({ onComplete }: any) => {
                                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Generating personalized improvement plan...</p>
                                     ) : (
                                         <ul style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                            {feedback?.plan?.map((p: any, i: number) => (
+                                            {Array.isArray(feedback?.plan) ? feedback.plan.map((p: any, i: number) => (
                                                 <li key={i} className="flex items-start gap-xs"> 
                                                     <span style={{ color: 'var(--accent-green)', marginTop: '2px' }}>★</span> 
                                                     <span>{typeof p === 'string' ? p : (p.step || p.action || JSON.stringify(p))}</span>
                                                 </li>
-                                            )) || <li>Continue your learning path</li>}
+                                            )) : <li>Continue your learning path</li>}
                                         </ul>
                                     )}
                                 </div>

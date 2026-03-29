@@ -142,7 +142,6 @@ def generate_quiz_feedback(results: list, subject: str, topic: str):
         count = cat_counts[k]
         cat_mastery[k] = (v / count) if count > 0 else overall_score
 
-    client = Groq(api_key=api_key)
     prompt = f"""
     Analyze these {subject} ({topic}) quiz results for a student.
     RAW PERFORMANCE METRICS (Use these as the base for the knowledge_graph):
@@ -151,9 +150,9 @@ def generate_quiz_feedback(results: list, subject: str, topic: str):
     RESULTS DATA: {json.dumps(results)}
     
     INSTRUCTIONS:
-    1. "gaps": Detailed technical explanation for every question marked 'is_correct': false.
-    2. "plan": 3 actionable, non-generic technical steps for improvement.
-    3. "knowledge_graph": 4 nodes matching these exact IDs and Labels.
+    1. "gaps": A LIST (ARRAY) of 3-5 strings. Provide a technical explanation for every question marked 'is_correct': false.
+    2. "plan": A LIST (ARRAY) of 3 actionable, non-generic technical steps for improvement.
+    3. "knowledge_graph": A LIST (ARRAY) of exactly 4 nodes matching these exact IDs and Labels.
        Adjust "level" (0.0 to 1.0) and "status" based on the RAW PERFORMANCE METRICS provided above.
        - status: "done" (if level > 0.8), "learning" (if level 0.4-0.8), "struggling" (if level < 0.4)
        
@@ -164,9 +163,11 @@ def generate_quiz_feedback(results: list, subject: str, topic: str):
          {{"id": "4", "label": "Implementation", "level": {cat_mastery['Implementation']}, "status": "..."}}
        ]
     
-    Return ONLY a JSON object. Ensure the visual analytics (knowledge_graph) perfectly align with the metrics.
+    CRITICAL: "gaps" and "plan" MUST ALWAYS BE ARRAYS. For example: {{"gaps": ["Issue 1", "Issue 2"], "plan": ["Step 1"]}}.
+    Return ONLY a valid JSON object.
     """
     
+    client = Groq(api_key=api_key)
     try:
         res = client.chat.completions.create(
             messages=[
@@ -177,6 +178,17 @@ def generate_quiz_feedback(results: list, subject: str, topic: str):
             response_format={"type": "json_object"}
         )
         data = json.loads(res.choices[0].message.content)
+        
+        # Robustness check to prevent frontend .map() crashes
+        if "gaps" in data and isinstance(data["gaps"], str):
+             data["gaps"] = [data["gaps"]]
+        if "plan" in data and isinstance(data["plan"], str):
+             data["plan"] = [data["plan"]]
+        if "gaps" not in data or not isinstance(data["gaps"], list):
+             data["gaps"] = ["General review of foundational concepts recommended."]
+        if "plan" not in data or not isinstance(data["plan"], list):
+             data["plan"] = ["Review the explanation for missed questions.", "Practice similar problems.", "Deepen understanding of core principles."]
+             
         return data
     except Exception as e:
         print(f"Feedback AI Error: {e}")
