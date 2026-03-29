@@ -193,7 +193,8 @@ def _search_ddg_jobs(role: str, level: str, city: str, max_results: int = 8) -> 
     try:
         with DDGS() as ddgs:
             for query in queries:
-                for r in ddgs.text(query, region="in-en", safesearch="moderate", timelimit="m"):
+                # timelimit="w" for past week
+                for r in ddgs.text(query, region="in-en", safesearch="moderate", timelimit="w"):
                     title = r.get("title", "").strip()
                     snippet = r.get("body", "").strip()
                     link = r.get("href", "").strip()
@@ -664,7 +665,8 @@ def _serper_job_search(role: str, level: str, city: str) -> List[Dict]:
     payload = json.dumps({
         "q": query, 
         "num": 12,
-        "gl": "in" # Focus Google search on India for regional results
+        "gl": "in", # Focus Google search on India for regional results
+        "tbs": "qdr:w" # tbs: qdr:w means past week only
     })
     headers = {
         'X-API-KEY': serper_key,
