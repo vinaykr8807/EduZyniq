@@ -137,6 +137,17 @@ npm run dev
 
 Frontend runs on Vite default port (`5173`).
 
+### 6) Expose Local Backend (Cloudflare Tunnel)
+
+To expose your local backend to the internet (e.g., for Vercel frontend to access your local machine's Docker engine), use Cloudflare Tunnel:
+
+```bash
+# Expose the backend port (currently set to 8001)
+cloudflared tunnel --url http://localhost:8001
+```
+
+Copy the `*.trycloudflare.com` URL generated and set it as `VITE_API_URL` in your Vercel or frontend environment.
+
 ## Core Modules
 
 - Interview Coach: resume deep analysis, skill-gap mapping, interview plan and evaluation
