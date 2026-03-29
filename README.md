@@ -34,6 +34,42 @@ Edunovas combines multiple learning modules in one interface:
 └── README.md
 ```
 
+## System Architecture
+
+```mermaid
+graph TD
+    User((Student)) <-->|React Dashboard| Frontend[Vite Frontend - Vercel]
+    Frontend <-->|Cloudflare Tunnel| Backend[FastAPI Backend - Local]
+    
+    subgraph "AI Core & Agents"
+        Backend -->|Llama 3.3 70B| LLM[Groq AI Engine]
+        Backend -->|Real-time Market| Serper[Serper API]
+        Backend -->|RAG Pipeline| VectorBD[Supabase Vector / FAISS]
+    end
+    
+    subgraph "Specialized Services"
+        Backend -->|Sandbox Run| Docker[Local Docker Engine]
+        Backend -->|Notes Gen| PDFGen[ReportLab PDF Engine]
+        Backend -->|Visuals| PexelsWiki[Pexels & Wikipedia API]
+    end
+    
+    subgraph "Infrastructure"
+        Backend <-->|Auth & SQL| Supabase[Supabase Postgres/Storage]
+    end
+```
+
+### 🎨 Frontend Architecture (React)
+- **Framework**: React 19 with Vite for ultra-fast HMR.
+- **UI Engine**: Vanilla CSS + Glassmorphism design system for a premium developer aesthetic.
+- **Navigation**: State-driven module switching (Teacher → Quiz Master flow).
+- **Visualization**: Dynamic rendering of D2, Mermaid, and LaTeX for technical diagrams and equations.
+
+### ⚙️ Backend Architecture (FastAPI)
+- **Agentic Logic**: Individual handlers for Interview Coaching, Coding Mentorship, and Curriculum Management.
+- **Code Execution**: Docker-based sandbox system for safe multi-language execution (Python, Node, C++, Java).
+- **Personal RAG**: Intelligent context injection using past student doubts and teacher explanations from Supabase.
+- **Real-time Insights**: Dynamic market trend analysis powered by Serper API and Groq LLM.
+
 ## Tech Stack
 
 - Frontend: React 19, TypeScript, React Router, Vite
