@@ -32,13 +32,51 @@ class HistoricalMarketData:
     def __init__(self):
         self._cache_overview = None
     
-    def get_role_trends(self, role: str, domain: Optional[str] = None) -> Dict[str, Any]:
-        """Stubbed to prevent application breaks if called by other services."""
-        return {
-            "trend_line": [{"year": "2021", "count": 100}, {"year": "2025", "count": 150}],
-            "top_historical_companies": [{"name": "Tech Corp", "count": 50}],
-            "total_historical_records": 1000
-        }
+    def get_role_trends(self, role: str) -> Dict[str, Any]:
+        """Uses Serper API + Groq to generate real-time trend analysis for a specific role."""
+        snippets = fetch_serper_snippets(f"{role} job market hiring trends past decade statistics hiring volume growth global data")
+        
+        groq_key = os.getenv("GROQ_API_KEY")
+        if not groq_key:
+            return {
+                "trend_line": [{"year": "2021", "count": 45000}, {"year": "2022", "count": 68000}, {"year": "2023", "count": 52000}, {"year": "2024", "count": 59000}, {"year": "2025", "count": 64000}],
+                "top_historical_companies": [{"name": "Tech Corp", "count": 50}],
+                "total_historical_records": 1000
+            }
+            
+        client = Groq(api_key=groq_key)
+        
+        prompt = f"""
+        Generate a JSON object representing the historical market trend for the role: "{role}".
+        Context from search: "{snippets}"
+        
+        Required JSON format:
+        {{
+            "trend_line": [{{"year": "YYYY", "count": integer}}], # Exactly 5 years ending in 2024 or 2025
+            "top_historical_companies": [{{"name": "Company Name", "count": integer}}], # top 3 companies hiring for this role
+            "total_historical_records": integer # approximate total volume
+        }}
+        
+        Instructions:
+        - Counts should be realistic for the global tech industry (tens of thousands).
+        - Output ONLY valid JSON.
+        """
+        
+        try:
+            res = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.3-70b-versatile",
+                response_format={"type": "json_object"},
+                temperature=0.3
+            )
+            return json.loads(res.choices[0].message.content)
+        except Exception as e:
+            print(f"Role trends error: {e}")
+            return {
+                "trend_line": [{"year": "2021", "count": 12000}, {"year": "2025", "count": 18500}],
+                "top_historical_companies": [{"name": "Generic Tech", "count": 450}],
+                "total_historical_records": 50000
+            }
 
     def get_market_overview(self) -> Dict[str, Any]:
         """Uses Serper API + Groq to generate real-time long term market analysis across IT domains."""
