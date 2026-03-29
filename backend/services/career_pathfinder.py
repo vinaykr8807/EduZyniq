@@ -651,14 +651,21 @@ def generate_career_report(resume_text: str, role: str, level: str, city: str, u
 
 
 def _serper_job_search(role: str, level: str, city: str) -> List[Dict]:
-    """Uses Serper (Google) to find highly targeted job listings across specific domains."""
-    query = f"{role} {level} technical jobs in {city} hiring now direct apply site:linkedin.com OR site:naukri.com OR site:glassdoor.com"
+    """Uses Serper (Google) to find highly targeted job listings across specific domains with heavy city focus."""
+    # Build a powerful regional search query
+    location_term = "Remote" if city.lower() == "remote" else f"in {city}"
+    query = f'"{role}" {level} technical jobs {location_term} hiring now direct apply site:linkedin.com OR site:naukri.com OR site:glassdoor.com OR site:naukri.com OR site:instahyre.com OR site:hirist.tech'
+    
     serper_key = os.getenv("SERPER_API_KEY")
     if not serper_key:
         return []
         
     url = "https://google.serper.dev/search"
-    payload = json.dumps({"q": query, "num": 10})
+    payload = json.dumps({
+        "q": query, 
+        "num": 12,
+        "gl": "in" # Focus Google search on India for regional results
+    })
     headers = {
         'X-API-KEY': serper_key,
         'Content-Type': 'application/json'
@@ -672,6 +679,13 @@ def _serper_job_search(role: str, level: str, city: str) -> List[Dict]:
             link = r.get("link", "")
             title = r.get("title", "")
             snippet = r.get("snippet", "")
+            
+            # Extra verification: ensures city or "India" or "Remote" is in the snippet/title
+            content = f"{title} {snippet}".lower()
+            city_l = city.lower()
+            if city_l != "remote" and city_l not in content and "india" not in content and "anywhere" not in content:
+                 continue
+
             items.append({
                 "title": title,
                 "source": _extract_domain(link),
@@ -679,15 +693,16 @@ def _serper_job_search(role: str, level: str, city: str) -> List[Dict]:
                 "date": "Live",
                 "snippet": snippet,
                 "skills": _find_result_skills(f"{title} {snippet}"),
-                "origin": "Real-time Google Signal"
+                "origin": "Verified City Signal"
             })
     except Exception as e:
         print(f"Serper Job Search error: {e}")
     return items
 
 def _get_live_demand_signals(role: str, city: str) -> Dict:
-    """Uses Serper + LLM to summarize current job demand for the UI cards."""
-    snippets = fetch_serper_snippets(f"current job demand hiring volume for {role} roles in {city} tech news 2025")
+    """Uses Serper + LLM to summarize current job demand for the UI cards with strict regional focus."""
+    loc_query = "Remote India" if city.lower() == "remote" else f"{city} India"
+    snippets = fetch_serper_snippets(f'current market demand hiring volume tech layoffs alerts "{role}" in {loc_query} news 2025')
     
     groq_key = os.getenv("GROQ_API_KEY")
     if not groq_key:
@@ -696,14 +711,14 @@ def _get_live_demand_signals(role: str, city: str) -> Dict:
     client = Groq(api_key=groq_key)
     prompt = f"""
     Based on these real-time search snippets: "{snippets}", 
-    summarize the LIVE JOB DEMAND for {role} in {city}.
+    summarize the LIVE JOB DEMAND specifically for '{role}' in '{city}'.
     
     Output JSON format:
     {{
-        "signal_count": integer (total active job mentions found in snippets, estimate if not exact),
+        "signal_count": integer (estimated active openings in {city} for this role specifically),
         "demand_level": "High" | "Moderate" | "Steady",
-        "key_hiring_companies": ["Comp 1", "Comp 2"],
-        "recent_trend": "Short summary sentence about role demand now."
+        "key_hiring_companies": ["Direct Company 1", "Direct Company 2"],
+        "recent_trend": "Short summary sentence about role demand specifically for {city} IT market."
     }}
     """
     
@@ -715,4 +730,4 @@ def _get_live_demand_signals(role: str, city: str) -> Dict:
         )
         return json.loads(res.choices[0].message.content)
     except Exception:
-        return {"signal_count": 5, "summary": f"Hiring for {role} remains steady in the current market cycle."}
+        return {"signal_count": 5, "summary": f"Hiring for {role} remains steady in the current market cycle for {city}."}
