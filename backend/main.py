@@ -921,8 +921,13 @@ def get_performance_stats(user_email: str):
         
         user_id = user_res.data[0]['id']
 
-        # 1. Quiz Performance
-        quizzes = supabase.table('quiz_sessions').select('score, created_at').eq('user_id', user_id).order('created_at', desc=True).limit(10).execute()
+        # 1. Quiz Performance (Prioritize quiz_history for modern records)
+        quizzes = supabase.table('quiz_history').select('score, date').eq('user_id', user_id).order('date', desc=True).limit(10).execute()
+        
+        # Fallback to legacy quiz_sessions if history is empty
+        if not quizzes.data:
+            quizzes = supabase.table('quiz_sessions').select('score, created_at').eq('user_id', user_id).order('created_at', desc=True).limit(10).execute()
+            
         quiz_accuracy = round(sum(q['score'] for q in quizzes.data) / len(quizzes.data)) if quizzes.data else 0
         accuracy_trend = [q['score'] for q in reversed(quizzes.data)] if quizzes.data else [0]
 
