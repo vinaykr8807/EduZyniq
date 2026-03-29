@@ -457,16 +457,25 @@ export const QuizMaster = ({ onComplete }: any) => {
                         <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>📝 Question Review</h4>
                         {quiz?.map((q, i) => {
                             let itemCorrect = false;
+                            const userAns = answers[i];
+                            const isSkipped = userAns === "SKIPPED";
+                            
                             if (q.type === 'matching' && q.matching_pairs) {
-                                const userMatches = JSON.parse(answers[i] || '{}');
-                                const totalPairs = Object.keys(q.matching_pairs).length;
-                                let correctPairs = 0;
-                                Object.entries(q.matching_pairs).forEach(([k, v]) => {
-                                    if (userMatches[k] === v) correctPairs++;
-                                });
-                                itemCorrect = correctPairs === totalPairs;
+                                if (!isSkipped) {
+                                    try {
+                                        const userMatches = JSON.parse(userAns || '{}');
+                                        const totalPairs = Object.keys(q.matching_pairs).length;
+                                        let correctPairs = 0;
+                                        Object.entries(q.matching_pairs).forEach(([k, v]) => {
+                                            if (userMatches[k] === v) correctPairs++;
+                                        });
+                                        itemCorrect = correctPairs === totalPairs;
+                                    } catch { itemCorrect = false; }
+                                } else {
+                                    itemCorrect = false;
+                                }
                             } else {
-                                itemCorrect = answers[i] === q.answer;
+                                itemCorrect = userAns === q.answer;
                             }
 
                             return (
@@ -476,14 +485,14 @@ export const QuizMaster = ({ onComplete }: any) => {
                                             <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Q{i+1}: {q.question}</span>
                                             {!itemCorrect && (
                                                 <span style={{ fontSize: '0.75rem', color: 'var(--accent-red)' }}>
-                                                    Your Answer: {q.type === 'matching' ? 'Incorrect Arrangement' : answers[i]}
+                                                    Your Answer: {isSkipped ? 'Skipped' : (q.type === 'matching' ? 'Incorrect Arrangement' : userAns)}
                                                 </span>
                                             )}
                                             <span style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
                                                 Correct Answer: {q.type === 'matching' ? 'Correct Arrangement' : q.answer}
                                             </span>
                                         </div>
-                                        <span style={{ fontSize: '1.2rem' }}>{itemCorrect ? '✅' : '❌'}</span>
+                                        <span style={{ fontSize: '1.2rem' }}>{itemCorrect ? '✅' : (isSkipped ? '⏭️' : '❌')}</span>
                                     </div>
                                     <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid var(--glass-border)', paddingTop: '0.5rem' }}>
                                         <strong>Mentor Note:</strong> {q.explanation}
