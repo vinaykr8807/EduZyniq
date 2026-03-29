@@ -1,287 +1,332 @@
 import { Link } from 'react-router-dom';
 
-
 export const Home = () => {
     return (
-        <div className="fade-in" style={{ background: 'var(--bg-primary)', minHeight: '100vh', paddingBottom: '100px' }}>
-            {/* 🚀 High-Energy Hero Section */}
+        <div className="fade-in" style={{ background: '#f8fafc', minHeight: '100vh', paddingBottom: '0' }}>
+            {/* 1. 🚀 HERO SECTION */}
             <section style={{
-                padding: '180px 0 120px',
-                textAlign: 'center',
+                padding: '160px 0 100px',
+                background: 'linear-gradient(180deg, rgba(59, 130, 246, 0.05) 0%, rgba(255, 255, 255, 0) 100%)',
                 position: 'relative',
-                overflow: 'hidden',
-                background: 'radial-gradient(circle at top, rgba(52, 160, 90, 0.08) 0%, transparent 60%)'
+                overflow: 'hidden'
             }}>
-                <div style={{
-                    position: 'absolute',
-                    top: '-10%',
-                    right: '-5%',
-                    width: '600px',
-                    height: '600px',
-                    background: 'radial-gradient(circle, rgba(100, 130, 255, 0.05) 0%, transparent 70%)',
-                    filter: 'blur(100px)',
-                    zIndex: 0
-                }} />
-                
-                <div className="container" style={{ position: 'relative', zIndex: 1 }}>
-                    <div className="badge mb-md" style={{ 
-                        padding: '0.7rem 1.6rem', 
-                        background: 'rgba(52, 160, 90, 0.05)', 
-                        border: '1px solid var(--primary-500)',
-                        fontSize: '0.75rem',
-                        letterSpacing: '3px',
-                        fontWeight: 900,
-                        color: 'var(--primary-400)'
-                    }}>
-                        NEXT-GEN TECHNICAL CO-PILOT
+                <div className="container" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', alignItems: 'center', gap: '4rem' }}>
+                    <div>
+                        <div style={{
+                            display: 'inline-block',
+                            padding: '0.4rem 1rem',
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            borderRadius: '100px',
+                            color: '#3b82f6',
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            letterSpacing: '1px',
+                            marginBottom: '1.5rem',
+                            textTransform: 'uppercase'
+                        }}>
+                            AI-Powered Learning
+                        </div>
+                        <h1 style={{ 
+                            fontSize: 'clamp(3rem, 5vw, 4.5rem)', 
+                            fontWeight: 900, 
+                            lineHeight: 1.1, 
+                            color: '#0f172a',
+                            marginBottom: '1.5rem',
+                            letterSpacing: '-1.5px',
+                            background: 'none',
+                            WebkitTextFillColor: 'initial',
+                        }}>
+                            Master the machine.<br />
+                            <span style={{ color: '#3b82f6' }}>Forge your future.</span>
+                        </h1>
+                        <p style={{
+                            fontSize: '1.15rem',
+                            color: '#64748b',
+                            maxWidth: '540px',
+                            marginBottom: '2.5rem',
+                            lineHeight: 1.6
+                        }}>
+                            An intelligent ecosystem for the modern engineer. 47.2% faster skill acquisition through AI-driven curriculum synthesis.
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <Link to="/assistant" className="btn" style={{ 
+                                background: '#3b82f6', 
+                                color: 'white', 
+                                padding: '1rem 2.5rem', 
+                                borderRadius: '12px',
+                                textDecoration: 'none',
+                                fontWeight: 700,
+                                fontSize: '0.95rem'
+                            }}>
+                                Launch Platform <span>→</span>
+                            </Link>
+                            <Link to="/curriculum" className="btn" style={{ 
+                                border: '1px solid #e2e8f0', 
+                                color: '#475569', 
+                                padding: '1rem 2.5rem', 
+                                borderRadius: '12px',
+                                textDecoration: 'none',
+                                fontWeight: 700,
+                                fontSize: '0.95rem',
+                                background: 'white'
+                            }}>
+                                Explore Curriculum
+                            </Link>
+                        </div>
                     </div>
-                    <h1 style={{ 
-                        marginBottom: '1.5rem', 
-                        lineHeight: 0.95, 
-                        fontSize: 'clamp(3.5rem, 8vw, 6rem)', 
-                        fontWeight: 900,
-                        letterSpacing: '-3px'
-                    }}>
-                        Master Systems <br />
-                        <span className="gradient-text">Not Just Syntax.</span>
-                    </h1>
-                    <p style={{
-                        fontSize: '1.35rem',
-                        color: 'var(--text-secondary)',
-                        maxWidth: '850px',
-                        margin: '0 auto 3.5rem',
-                        lineHeight: 1.5,
-                        fontWeight: 500
-                    }}>
-                        The first AI ecosystem that bridges the gap between basic coding and senior system engineering. 
-                        Experience master-grade mentorship with automated architecture visualization and real-time skill gaps analysis.
-                    </p>
-                    <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center' }}>
-                        <Link to="/assistant" className="btn btn-primary" style={{ padding: '1.4rem 4rem', fontSize: '1.1rem', fontWeight: 800, borderRadius: '12px' }}>
-                            Initialize Forge ⚡
-                        </Link>
-                        <Link to="/curriculum" className="btn btn-secondary" style={{ padding: '1.4rem 4rem', fontSize: '1.1rem', fontWeight: 800, borderRadius: '12px' }}>
-                            Browse Curriculums
-                        </Link>
+
+                    {/* Right Side Visual */}
+                    <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+                         <div style={{
+                             width: '450px',
+                             height: '450px',
+                             background: 'radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(255, 255, 255, 0) 70%)',
+                             borderRadius: '50%',
+                             display: 'flex',
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                             position: 'relative'
+                         }}>
+                             <div style={{
+                                 width: '180px',
+                                 height: '180px',
+                                 background: '#dbeafe',
+                                 borderRadius: '50%',
+                                 display: 'flex',
+                                 alignItems: 'center',
+                                 justifyContent: 'center',
+                                 boxShadow: '0 20px 40px rgba(59, 130, 246, 0.15)',
+                                 border: '4px solid white'
+                             }}>
+                                 <span style={{ fontSize: '4.5rem' }}>✨</span>
+                             </div>
+                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* 🛠️ Specialized Technical Pillars */}
-            <section className="container" style={{ marginBottom: '160px' }}>
-                <div style={{ textAlign: 'center', marginBottom: '5rem' }}>
-                    <h2 style={{ fontSize: '3rem', fontWeight: 900, letterSpacing: '-1.5px' }}>Engineered for Professional Excellence</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', maxWidth: '700px', margin: '1rem auto 0' }}>Specialized AI agents designed to handle specific stages of your career growth.</p>
+            {/* 2. 🧩 INTELLIGENT LEARNING MODULES */}
+            <section className="container" style={{ padding: '140px 4rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '5.5rem' }}>
+                    <h2 style={{ fontSize: '3.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>
+                        Intelligent Learning <span style={{ color: '#3b82f6' }}>Modules</span>
+                    </h2>
+                    <p style={{ color: '#94a3b8', fontSize: '1.2rem', marginTop: '1rem', maxWidth: '700px', margin: '1rem auto 0' }}>
+                        Four AI-powered modules work in concert to accelerate your engineering mastery.
+                    </p>
                 </div>
 
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-                    gap: '2rem'
-                }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
                     {[
-                        {
-                            title: 'AI Technical Teacher',
-                            icon: '🏗️',
-                            desc: 'Architectural deep-dives with D2 System Diagram generation. Master the "why" behind distributed systems, concurrency, and DB persistence.',
-                            color: 'var(--primary-500)',
-                            tag: 'ARCHITECTURE'
-                        },
-                        {
-                            title: 'Quiz Master 2.0',
-                            icon: '🔬',
-                            desc: 'Adaptive recovery quizzes that detect weak areas. "Teach the AI" mode evaluates your explanation clarity against senior standards.',
-                            color: 'var(--accent-pink)',
-                            tag: 'DIAGNOSTICS'
-                        },
-                        {
-                            title: 'Career Pathfinder',
-                            icon: '🎯',
-                            desc: 'Live Market-Skill syncing. AI scans your resume vs active industry demand to provide a personalized roadmap to high-paying roles.',
-                            color: 'var(--accent-teal)',
-                            tag: 'STRATEGY'
-                        },
-                        {
-                            title: 'Interview Simulation',
-                            icon: '💼',
-                            desc: 'High-fidelity technical interviews. Role-based behavioral and system design sessions with immediate actionable feedback scorecards.',
-                            color: 'var(--accent-blue)',
-                            tag: 'SIMULATION'
-                        }
-                    ].map((feature, i) => (
-                        <div key={i} className="glass-card hover-glow" style={{ padding: '4rem 3rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ fontSize: '3rem' }}>{feature.icon}</div>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: feature.color, letterSpacing: '2px', border: `1px solid ${feature.color}44`, background: `${feature.color}11`, padding: '6px 12px', borderRadius: '6px' }}>{feature.tag}</span>
+                        { title: 'AI Technical Teacher', icon: '🎓', desc: 'Personalized explanations with adaptive depth, powered by advanced AI curriculum synthesis.' },
+                        { title: 'Quiz Master', icon: '📋', desc: 'Adaptive assessments that identify knowledge gaps and build mastery through targeted repetition.' },
+                        { title: 'Career Pathfinder', icon: '🗺️', desc: 'Data-driven career navigation with real-time market analysis and skill-gap mapping.' },
+                        { title: 'Interview Simulation', icon: '💬', desc: 'AI-powered mock interviews with role-specific evaluation and performance analytics.' }
+                    ].map((m, i) => (
+                        <div key={i} style={{ 
+                            background: 'white', 
+                            padding: '5rem 3rem', 
+                            borderRadius: '32px', 
+                            boxShadow: '0 12px 40px rgba(0,0,0,0.04)',
+                            border: '1px solid #f1f5f9',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2rem',
+                            transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            minHeight: '440px'
+                        }}>
+                            <div style={{ 
+                                width: '72px', height: '72px', background: '#eff6ff', borderRadius: '18px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem',
+                                boxShadow: 'inset 0 0 0 1px rgba(59, 130, 246, 0.1)'
+                            }}>
+                                {m.icon}
                             </div>
-                            <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: 0 }}>{feature.title}</h3>
-                            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, fontSize: '1.05rem', flex: 1 }}>{feature.desc}</p>
-                            <Link to="/assistant" style={{ color: feature.color, textDecoration: 'none', fontWeight: 800, fontSize: '0.8rem', letterSpacing: '1px' }} className="flex items-center gap-xs">
-                                LAUNCH MODULE <span style={{ fontSize: '1.2rem' }}>→</span>
-                            </Link>
+                            <h3 style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2, letterSpacing: '-0.5px' }}>{m.title}</h3>
+                            <p style={{ color: '#64748b', fontSize: '1.15rem', lineHeight: 1.8 }}>{m.desc}</p>
                         </div>
                     ))}
                 </div>
             </section>
 
-
-            {/* 🌀 The Hyper-Learning Loop Section */}
-            <section style={{ padding: '140px 0', position: 'relative' }}>
-                <div className="container">
-                     <div style={{ textAlign: 'center', marginBottom: '6rem' }}>
-                        <div className="badge mb-sm" style={{ color: 'var(--accent-pink)', borderColor: 'var(--accent-pink)33' }}>METHODOLOGY</div>
-                        <h2 style={{ fontSize: '3.5rem', fontWeight: 900, letterSpacing: '-2px' }}>The Hyper-Learning <span style={{ color: 'var(--accent-pink)' }}>Path</span></h2>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', maxWidth: '600px', margin: '1.5rem auto 0' }}>Our AI doesn't just teach. It evolves your technical foundation through a continuous feedback loop.</p>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
-                        {[
-                            { step: '01', title: 'Deep Ingestion', desc: 'AI Teacher breaks down high-level concepts into granular subtopics with architectural context.', color: 'var(--primary-500)' },
-                            { step: '02', title: 'Adaptive Stress', desc: 'Quiz Master 2.0 identifies exactly where your mental model breaks under technical pressure.', color: 'var(--accent-pink)' },
-                            { step: '03', title: 'Actionable Recovery', desc: 'Personalized improvement plans Bridge your specific skill gaps with precision training.', color: 'var(--accent-teal)' }
-                        ].map((item, i) => (
-                            <div key={i} className="glass-card" style={{ padding: '3.5rem 2.5rem', position: 'relative', overflow: 'hidden' }}>
-                                <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '8rem', fontWeight: 900, opacity: 0.03, color: item.color }}>{item.step}</div>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: item.color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 900, marginBottom: '2rem' }}>{item.step}</div>
-                                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '1rem' }}>{item.title}</h3>
-                                <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>{item.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* 🛠️ Integrated Tech Stack Section */}
-            <section style={{ padding: '100px 0', background: 'var(--bg-primary)' }}>
-                <div className="container">
-                    <div style={{ textAlign: 'center', marginBottom: '5rem' }}>
-                        <h2 style={{ fontSize: '3rem', fontWeight: 900, letterSpacing: '-1.5px' }}>The Core <span className="gradient-text">Engine</span></h2>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', marginTop: '1rem' }}>High-performance tools powering your learning journey.</p>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
-                        {[
-                            { name: 'Kroki Rendering', icon: '🎨', desc: 'Enterprise-grade visualization engine.' },
-                            { name: 'Groq Inference', icon: '⚡', desc: 'Sub-second AI response latency.' },
-                            { name: 'PostgreSQL', icon: '💾', desc: 'Secure, relational data persistence.' },
-                            { name: 'Supabase OSS', icon: '☁️', desc: 'Cloud-native infrastructure.' }
-                        ].map((tech, i) => (
-                            <div key={i} className="glass-card text-center" style={{ padding: '2.5rem 1.5rem' }}>
-                                <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{tech.icon}</div>
-                                <h4 style={{ fontWeight: 800, marginBottom: '0.5rem' }}>{tech.name}</h4>
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{tech.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* 🤖 AI Mentorship & Global Standards Section */}
-            <section style={{ padding: '120px 0', background: 'var(--bg-secondary)' }}>
-                <div className="container">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5rem', alignItems: 'center' }}>
-                        <div className="glass-card" style={{ padding: '3rem', border: '1px solid var(--accent-blue)33' }}>
-                             <div style={{ fontSize: '3rem', marginBottom: '2rem' }}>👨‍💻</div>
-                             <h3 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '1.5rem', letterSpacing: '-1px' }}>24/7 AI Mentorship</h3>
-                             <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '2rem' }}>
-                                 Never get stuck again. Our AI Mentor understands your progress, remembers your past mistakes, and guides you through complex debugging sessions with the patience of a senior lead.
-                             </p>
-                             <div className="flex-col gap-md">
-                                 {[
-                                     'Context-Aware Doubt Resolution',
-                                     'Personalized Debugging Support',
-                                     'Senior-Level Code Optimizations',
-                                     'Mental Model Alignment'
-                                 ].map(point => (
-                                     <div key={point} className="flex gap-sm items-center">
-                                         <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-blue)' }} />
-                                         <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{point}</span>
-                                     </div>
-                                 ))}
-                             </div>
-                        </div>
-                        <div>
-                            <div className="badge mb-sm" style={{ color: 'var(--accent-blue)', borderColor: 'var(--accent-blue)33' }}>GLOBAL STANDARDS</div>
-                            <h2 style={{ fontSize: '3.5rem', fontWeight: 900, marginBottom: '2rem', letterSpacing: '-2px' }}>Built for the <br /><span style={{ color: 'var(--accent-blue)' }}>FAANG Era</span></h2>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', lineHeight: 1.6, marginBottom: '3rem' }}>
-                                Our curriculum and evaluations are mapped against the engineering standards of top-tier tech companies. We don't just teach you to code; we teach you to engineer.
-                            </p>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                                <div className="glass-card" style={{ padding: '1.5rem' }}>
-                                    <h4 style={{ fontWeight: 800, color: 'var(--accent-blue)' }}>99.9%</h4>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>AI Technical Accuracy</p>
-                                </div>
-                                <div className="glass-card" style={{ padding: '1.5rem' }}>
-                                    <h4 style={{ fontWeight: 800, color: 'var(--accent-green)' }}>500+</h4>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Technical Subtopics</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* 🔥 Final CTA Section */}
-            <section className="container" style={{ padding: '160px 0' }}>
-                <div className="glass-card text-center" style={{
-                    padding: '8rem 2rem',
-                    background: 'radial-gradient(circle at top right, rgba(160, 100, 255, 0.15), transparent), radial-gradient(circle at bottom center, rgba(52, 160, 90, 0.15), transparent)',
-                    border: '1px solid var(--primary-500)',
-                    borderRadius: '40px'
-                }}>
-                    <h2 style={{ fontSize: 'max(3.5rem, 5vw)', marginBottom: '1.5rem', fontWeight: 900, letterSpacing: '-2px' }}>Stop Learning.<br />Start <span className="gradient-text">Mastering.</span></h2>
-                    <p style={{ fontSize: '1.4rem', color: 'var(--text-secondary)', maxWidth: '750px', margin: '0 auto 4rem', fontWeight: 500 }}>
-                        The future of technical education is specialized AI. Forge your career with tools that actually understand the engineering standard.
+            {/* 3. 🌀 HYPER-LEARNING PATH */}
+            <section className="container" style={{ padding: '140px 4rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '5.5rem' }}>
+                    <h2 style={{ fontSize: '3.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>
+                        Hyper-Learning <span style={{ color: '#3b82f6' }}>Path</span>
+                    </h2>
+                    <p style={{ color: '#94a3b8', fontSize: '1.2rem', marginTop: '1rem', maxWidth: '700px', margin: '1rem auto 0' }}>
+                        Three-phase methodology designed for accelerated technical mastery.
                     </p>
-                    <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center' }}>
-                        <Link to="/assistant" className="btn btn-primary" style={{ padding: '1.6rem 5rem', fontSize: '1.2rem', borderRadius: '100px', fontWeight: 900 }}>
-                            Access The Forge Now ⚡
-                        </Link>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2.5rem' }}>
+                    {[
+                        { step: '01', sub: 'STEP 01', title: 'Analyze', desc: 'AI scans your profile, skills, and career goals to build a personalized learning blueprint.' },
+                        { step: '02', sub: 'STEP 02', title: 'Synthesize', desc: 'Intelligent curriculum merges theory, practice, and market demands into optimized modules.' },
+                        { step: '03', sub: 'STEP 03', title: 'Launch', desc: 'Track progress with real-time analytics as you master each milestone in your journey.' }
+                    ].map((s, i) => (
+                        <div key={i} style={{ 
+                            background: 'white', 
+                            padding: '4rem 3.5rem', 
+                            borderRadius: '32px', 
+                            boxShadow: '0 8px 30px rgba(0,0,0,0.03)',
+                            border: '1px solid #f1f5f9',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            minHeight: '320px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center'
+                        }}>
+                            <div style={{ position: 'absolute', top: '15px', right: '2rem', fontSize: '6rem', fontWeight: 900, color: '#eff6ff', opacity: 1, zIndex: 0 }}>{s.step}</div>
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6', background: 'rgba(59, 130, 246, 0.08)', padding: '6px 14px', borderRadius: '8px', width: 'fit-content', marginBottom: '2rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.sub}</div>
+                                <h3 style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', marginBottom: '1.25rem' }}>{s.title}</h3>
+                                <p style={{ color: '#64748b', fontSize: '1.05rem', lineHeight: 1.75 }}>{s.desc}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+             {/* 4. ⚙️ CORE ENGINE */}
+             <section className="container" style={{ padding: '140px 4rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '5.5rem' }}>
+                    <h2 style={{ fontSize: '3.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>
+                        Core <span style={{ color: '#3b82f6' }}>Engine</span>
+                    </h2>
+                    <p style={{ color: '#94a3b8', fontSize: '1.15rem', marginTop: '1rem' }}>High-performance tools powering your learning journey.</p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
+                    {[
+                        { title: 'CodeX Intelligence', icon: '⌨️', desc: 'Real-time code analysis, optimization suggestions, and mentor feedback loops.' },
+                        { title: 'Precision Assessment', icon: '🎯', desc: 'Multi-dimensional evaluation across technical depth, clarity, and applied knowledge.' },
+                        { title: 'Adaptive AI', icon: '📈', desc: 'Models that evolve with your learning style, pace, and domain expertise.' },
+                        { title: 'Instant Feedback', icon: '⚡', desc: 'Sub-second analysis with actionable insights on every submission.' }
+                    ].map((m, i) => (
+                        <div key={i} style={{ 
+                            background: 'white', 
+                            padding: '3.5rem 2.5rem', 
+                            borderRadius: '24px', 
+                            boxShadow: '0 8px 30px rgba(0,0,0,0.03)',
+                            border: '1px solid #f1f5f9',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1.5rem',
+                            minHeight: '280px'
+                        }}>
+                            <div style={{ 
+                                width: '48px', height: '48px', background: '#eff6ff', borderRadius: '10px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem'
+                            }}>
+                                {m.icon}
+                            </div>
+                            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b' }}>{m.title}</h3>
+                            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.6 }}>{m.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* 5. 🤖 AI MENTORSHIP / PLATFORM INTELLIGENCE */}
+            <section className="container" style={{ padding: '140px 4rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '5.5rem' }}>
+                    <h2 style={{ fontSize: '3.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>
+                        AI <span style={{ color: '#3b82f6' }}>Mentorship</span>
+                    </h2>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '2.5rem' }}>
+                    {/* Feature List */}
+                    <div style={{ 
+                        background: 'white', 
+                        padding: '4.5rem 4rem', 
+                        borderRadius: '36px', 
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.03)',
+                        border: '1px solid #f1f5f9'
+                    }}>
+                        <h3 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', marginBottom: '3rem' }}>Platform Intelligence</h3>
+                        <div className="flex-col" style={{ gap: '2rem' }}>
+                            {[
+                                { t: 'Domain-specific curriculum tailored to industry demands', icon: '📖' },
+                                { t: 'AI mentors specialized across 9 engineering domains', icon: '🤝' },
+                                { t: 'Real-time market skill tracking and gap analysis', icon: '📉' },
+                                { t: 'Gamified progression with XP, badges, and streaks', icon: '🏅' }
+                            ].map((f, i) => (
+                                <div key={i} className="flex items-center" style={{ gap: '1.5rem' }}>
+                                    <div style={{ width: '48px', height: '48px', background: '#eff6ff', borderRadius: '12px', display: 'grid', placeItems: 'center', fontSize: '1.3rem' }}>{f.icon}</div>
+                                    <p style={{ fontSize: '1.1rem', color: '#475569', fontWeight: 500 }}>{f.t}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Metric Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                        {[
+                            { val: '47.2%', label: 'Faster skill acquisition' },
+                            { val: '9', label: 'Engineering domains' },
+                            { val: '10K+', label: 'Active learners' },
+                            { val: '98%', label: 'Satisfaction rate' }
+                        ].map((m, i) => (
+                            <div key={i} style={{ 
+                                background: 'white', 
+                                padding: '3rem 2rem', 
+                                borderRadius: '28px', 
+                                boxShadow: '0 8px 30px rgba(0,0,0,0.03)',
+                                border: '1px solid #f1f5f9',
+                                textAlign: 'center',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'center',
+                                gap: '0.75rem'
+                            }}>
+                                <h4 style={{ fontSize: '2.8rem', fontWeight: 900, color: '#3b82f6', letterSpacing: '-1.5px' }}>{m.val}</h4>
+                                <p style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{m.label}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </section>
 
-            {/* Custom Global CSS Additions */}
-            <style>{`
-                .hover-glow:hover {
-                    box-shadow: 0 0 60px rgba(52, 160, 90, 0.18);
-                    transform: translateY(-8px);
-                    border-color: var(--primary-500)88 !important;
-                }
-                .gradient-text {
-                    background: linear-gradient(135deg, var(--primary-400), var(--accent-teal), var(--secondary-500));
-                    -webkit-background-clip: text;
-                    background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                }
-                .diagram-full svg {
-                    width: 100% !important;
-                    height: 100% !important;
-                    max-width: none !important;
-                    display: block;
-                    background: transparent !important;
-                    position: absolute;
-                    top: 0;
-                    bottom: 0;
-                    left: 0;
-                    right: 0;
-                    object-fit: cover;
-                }
-                .diagram-full svg rect, .diagram-full svg path {
-                    vector-effect: non-scaling-stroke;
-                }
-                .diagram-full svg * {
-                    transition: all 0.5s ease;
-                }
-                .diagram-full .mermaid-loader {
-                    border: 3px solid rgba(52, 160, 90, 0.1);
-                    border-top: 3px solid var(--primary-500);
-                    border-radius: 50%;
-                    width: 30px;
-                    height: 30px;
-                    animation: spin 1s linear infinite;
-                }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            `}</style>
+            {/* 6. 🔥 FINAL CTA */}
+            <section className="container" style={{ padding: '120px 4rem 180px' }}>
+                <div style={{ 
+                    background: 'white', 
+                    padding: '6rem 2rem', 
+                    borderRadius: '40px', 
+                    boxShadow: '0 4px 40px rgba(0,0,0,0.02)',
+                    border: '1px solid #f1f5f9',
+                    textAlign: 'center'
+                }}>
+                    <h2 style={{ fontSize: '2.8rem', fontWeight: 900, color: '#0f172a', marginBottom: '1rem' }}>
+                        Ready to <span style={{ color: '#3b82f6' }}>Launch</span>?
+                    </h2>
+                    <p style={{ color: '#94a3b8', fontSize: '1rem', maxWidth: '500px', margin: '0 auto 2.5rem', lineHeight: 1.6 }}>
+                        Join thousands of engineers accelerating their careers with AI-powered learning.
+                    </p>
+                    <Link to="/assistant" className="btn" style={{ 
+                        background: '#3b82f6', 
+                        color: 'white', 
+                        padding: '1.2rem 3.5rem', 
+                        borderRadius: '12px',
+                        textDecoration: 'none',
+                        fontWeight: 800,
+                        fontSize: '1rem'
+                    }}>
+                        Get Started <span>→</span>
+                    </Link>
+                </div>
+            </section>
+
+            {/* 7. ⚖️ FOOTER */}
+            <footer style={{ padding: '4rem 0', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                    © 2026 Edunovas. All rights reserved.
+                </p>
+            </footer>
         </div>
     );
 };

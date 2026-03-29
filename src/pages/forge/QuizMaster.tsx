@@ -45,8 +45,17 @@ export const QuizMaster = ({ onComplete }: any) => {
     const [matchingState, setMatchingState] = useState<{ left: string | null, right: string | null }>({ left: null, right: null });
     const [tempMatches, setTempMatches] = useState<Record<string, string>>({});
 
-    // Auto-detect domain
+    // Auto-detect domain & targeted intents
     useEffect(() => {
+        const pendingMode = localStorage.getItem('pending_quiz_mode');
+        if (pendingMode) {
+            setQuizMode(pendingMode);
+            localStorage.removeItem('pending_quiz_mode');
+            
+            // Add a small delay to simulate auto-clicking "Start Assessment" if you want
+            // but setting the mode ensures they see the targeted screen properly.
+        }
+
         const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
         if (!user.email) return;
 

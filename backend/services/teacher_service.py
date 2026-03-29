@@ -6,6 +6,7 @@ from groq import Groq
 from dotenv import load_dotenv
 from services.pexels_service import get_pexels_image, get_pexels_video
 from services.wikipedia_service import get_wikipedia_image
+import requests
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
@@ -40,9 +41,17 @@ def _normalize_latex_text(text: str) -> str:
             (r'(?<!\\)begin\{', r'\\begin{'),
             (r'(?<!\\)end\{', r'\\end{'),
             (r'(?<!\\)frac\{', r'\\frac{'),
+            (r'(?<!\\)text\{', r'\\text{'),
+            (r'(?<![\\\w])ext\{', r'\\text{'),     # Case where \t was eaten
+            (r'(?<![\\\w])imes\b', r'\\times'),  # Case where \t was eaten
+            (r'(?<![\\\w])right\b', r'\\right'), # Case where \r was eaten
+            (r'(?<![\\\w])ight\b', r'\\right'),  # Case where \ri was eaten
+            (r'(?<![\\\w])left\b', r'\\left'),
+            (r'(?<![\\\w])eft\b', r'\\left'),    # Case where \l was eaten
             (r'(?<!\\)cdot\b', r'\\cdot'),
             (r'(?<!\\)times\b', r'\\times'),
             (r'(?<!\\)theta\b', r'\\theta'),
+            (r'(?<![\\\w])heta\b', r'\\theta'),
             (r'(?<!\\)alpha\b', r'\\alpha'),
             (r'(?<!\\)beta\b', r'\\beta'),
             (r'(?<!\\)lambda\b', r'\\lambda'),
@@ -51,17 +60,35 @@ def _normalize_latex_text(text: str) -> str:
             (r'(?<!\\)mu\b', r'\\mu'),
             (r'(?<!\\)rho\b', r'\\rho'),
             (r'(?<!\\)rightarrow\b', r'\\rightarrow'),
-            (r'(?<!\\)left\b', r'\\left'),
-            (r'(?<!\\)right\b', r'\\right'),
-            (r'(?<!\\)text\{', r'\\text{'),
+            (r'(?<![\\\w])ightarrow\b', r'\\rightarrow'),
+            (r'(?<!\\)sum\b', r'\\sum'),
+            (r'(?<![\\\w])um\b', r'\\sum'),
         ]
         for pattern, replacement in fixes:
             t = re.sub(pattern, replacement, t)
         return t
 
     if '```' in text:
-        parts = re.split(r'(```[\s\S]*?```)', text)
-        return "".join([p if p.startswith('```') else _do_repairs(p) for p in parts])
+        # Split by triple backticks. The separators will be in segments
+        segments = text.split('```')
+        new_segments = []
+        is_inside_code = False
+        
+        for idx, segment in enumerate(segments):
+            if is_inside_code:
+                # We are directly after an opening ```.
+                # Re-add the triple backticks we removed with split()
+                new_segments.append('```' + segment)
+                # If there's another segment coming, it means there's a closing ```
+                if idx < len(segments) - 1:
+                    new_segments[-1] += '```'
+                is_inside_code = False
+            else:
+                # We are in plain text
+                new_segments.append(_do_repairs(segment))
+                is_inside_code = True
+        
+        return "".join(new_segments)
     
     return _do_repairs(text)
 
@@ -80,6 +107,7 @@ def _normalize_latex_payload(value):
 def _parse_groq_json(raw: str) -> dict:
     """Robustly extract JSON from a Groq response that may have markdown fences or unescaped LaTeX backslashes."""
     import re
+    import json
     # Strip leading/trailing whitespace
     raw = raw.strip()
     
@@ -92,35 +120,26 @@ def _parse_groq_json(raw: str) -> dict:
     if match:
         raw = match.group(0)
 
-    def repair_corrupted_latex(text):
-        # 1. Restore common control characters misparsed as LaTeX
-        text = text.replace('\f', '\\f') # \f -> \frac, \functions
-        text = text.replace('\b', '\\b') # \b -> \begin, \mathbb
-        text = text.replace('\r', '\\r') # \r -> \rho, \rightarrow
-        text = text.replace('\t', '\\t') # \t -> \text, \theta, \times
-        text = text.replace('\n', '\\n') # \n -> \nu, \nabla, \normalsize
-        # 2. Clean extra quotes or artifacts that might break JSON
-        return text
-
-    def fix_backslashes(text):
-        text = text.replace('\\"', '___QUOTE_ESC___')
-        text = text.replace('\\', '\\\\')
-        text = text.replace('___QUOTE_ESC___', '\\"')
-        return text
+    # 1. Clean common AI-generated JSON artifacts
+    # Replace literal control characters if they slipped into the raw JSON string
+    def repair_json_string(s):
+        # We only want to handle cases where actual control characters (0-31) were used
+        # which would break json.loads
+        return s.replace('\f', '\\f').replace('\b', '\\b').replace('\r', '\\r').replace('\t', '\\t')
 
     try:
-        # First repair existing corruption
-        repaired = repair_corrupted_latex(raw)
-        # Then double-escape for json.loads consistency
-        fixed = fix_backslashes(repaired)
-        return _normalize_latex_payload(json.loads(fixed))
-    except Exception:
-        # Fallback
+        # We use strict=False to allow literal control characters (like newlines) 
+        # that some models mistakenly include in JSON strings.
+        return _normalize_latex_payload(json.loads(repair_json_string(raw), strict=False))
+    except Exception as e:
+        print(f"JSON Parse Error (Attempt 1): {e}")
+        # Final fallback - try raw content if it's already a clean JSON string
         try:
-            return _normalize_latex_payload(json.loads(raw))
-        except Exception as e:
-            print(f"JSON Parse Error: {e}")
-            raise e
+            return _normalize_latex_payload(json.loads(raw, strict=False))
+        except Exception as e2:
+            print(f"JSON Parse Error (Final Fallback): {e2}")
+            # If everything fails, it's not valid JSON
+            raise e2
 
 
 def _sanitize_d2(d2: str) -> str:
@@ -637,11 +656,13 @@ CRITICAL:
         from services.wikipedia_service import get_wikipedia_image
         img_url = get_wikipedia_image(subtopic)
         if img_url:
-            resp = requests.get(img_url, timeout=5)
+            headers = {"User-Agent": "EdunovasAI/1.0 (https://edunovas.ai) requests/2.0"}
+            resp = requests.get(img_url, headers=headers, timeout=5)
             if resp.ok:
                 story.append(Image(BytesIO(resp.content), width=16*cm, height=8*cm))
                 story.append(Spacer(1, 10))
-    except: pass
+    except Exception as e:
+        print(f"Error including wiki image in PDF: {e}")
 
     if data.get("executive_abstract"):
         story.append(Paragraph("📌 Executive Abstract", section_style))

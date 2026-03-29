@@ -1,159 +1,206 @@
-import { RoadmapSelector } from '../../components/RoadmapSelector';
+import { useState } from 'react';
+import { CURRICULUM_DATA } from '../../data/curriculumData';
 
 export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any) => {
+    const [expandedRoadmap, setExpandedRoadmap] = useState<string | null>('cloud');
+
     return (
-        <div className="flex-col gap-xl">
-            {/* Header / Snapshot */}
-            <header className="flex justify-between items-end">
-                <div>
-                    <h2 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '0.2rem' }} className="gradient-text">Forge Launchpad</h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>
-                        Integrated AI Operating System for <strong>{profile?.domain || 'Career Development'}</strong>
+        <div className="flex-col gap-2xl fade-in" style={{ padding: '0 0 4rem', color: '#1e293b' }}>
+            {/* 1. Header Area */}
+            <div className="flex justify-between items-start">
+                <div className="flex-col gap-xs">
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Career Forge</h2>
+                    <h1 style={{ fontSize: '2.2rem', fontWeight: 900, margin: '0.5rem 0 0' }}>
+                        Forge <span style={{ color: '#3b82f6' }}>Launchpad</span>
+                    </h1>
+                    <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                        {profile?.domain || 'Full-stack Developer'}
                     </p>
+                    <div className="flex gap-sm">
+                        <span style={{ 
+                            background: '#eff6ff', color: '#3b82f6', padding: '0.4rem 1rem', 
+                            borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800 
+                        }}>
+                            Level {progress?.level || 1}
+                        </span>
+                        <span style={{ 
+                            color: '#64748b', fontSize: '0.8rem', fontWeight: 700, 
+                            display: 'flex', alignItems: 'center', gap: '6px' 
+                        }}>
+                            💎 {progress?.points || 0} XP
+                        </span>
+                    </div>
                 </div>
-                <div className="glass-card flex items-center gap-md" style={{ padding: '0.75rem 1.5rem', borderRadius: 'var(--radius-xl)' }}>
-                    <div className="flex-col items-end">
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)' }}>LEVEL</span>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--accent-blue)' }}>{progress?.level || 1}</span>
-                    </div>
-                    <div style={{ width: '2px', height: '24px', background: 'var(--glass-border)' }}></div>
-                    <div className="flex-col items-end">
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)' }}>TOTAL XP</span>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--accent-green)' }}>{progress?.points || 0}</span>
-                    </div>
-                </div>
-            </header>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '2rem' }}>
-                <div className="flex-col gap-xl">
-                    {/* Metrics Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                        <div className="glass-card flex-col gap-md" style={{ padding: '1.25rem', border: '1px solid var(--accent-blue)' }}>
-                            <div className="flex justify-between items-center">
-                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--accent-blue)' }}>QUIZ ACCURACY</span>
-                                <span style={{ fontSize: '1.2rem' }}>🎯</span>
-                            </div>
-                            <h3 style={{ fontSize: '1.8rem', fontWeight: 900 }}>{stats?.quiz_accuracy || 0}%</h3>
-                            <div style={{ height: '5px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${stats?.quiz_accuracy || 0}%`, background: 'var(--accent-blue)', borderRadius: '3px' }}></div>
-                            </div>
-                        </div>
-                        <div className="glass-card flex-col gap-md" style={{ padding: '1.25rem', border: '1px solid var(--accent-green)' }}>
-                            <div className="flex justify-between items-center">
-                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--accent-green)' }}>INTERVIEW READINESS</span>
-                                <span style={{ fontSize: '1.2rem' }}>👔</span>
-                            </div>
-                            <h3 style={{ fontSize: '1.8rem', fontWeight: 900 }}>{stats?.interview_score || 0}%</h3>
-                            <div style={{ height: '5px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${stats?.interview_score || 0}%`, background: 'var(--accent-green)', borderRadius: '3px' }}></div>
-                            </div>
-                        </div>
-                        <div className="glass-card flex-col gap-md" style={{ padding: '1.25rem', border: '1px solid var(--accent-red)' }}>
-                            <div className="flex justify-between items-center">
-                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--accent-red)' }}>CODE OPTIMIZATION</span>
-                                <span style={{ fontSize: '1.2rem' }}>⚡</span>
-                            </div>
-                            <h3 style={{ fontSize: '1.8rem', fontWeight: 900 }}>{stats?.code_optimization || 100}%</h3>
-                            <div style={{ height: '5px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${stats?.code_optimization || 100}%`, background: 'var(--accent-red)', borderRadius: '3px' }}></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-between items-center" style={{ margin: '1rem 0 1.5rem' }}>
-                        <h3 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2px', color: 'var(--text-muted)' }}>Active Intelligence Modules</h3>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '3rem' }}>
+                <div className="flex-col gap-2xl">
+                    {/* 📊 2. Statistics Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
                         {[
-                            {
-                                id: 'INTERVIEWER', icon: '🎤', name: 'Interview Coach',
-                                tagline: 'Upload resume → Groq AI detects your skill gaps vs today\'s market demand. Get a readiness score + personalized roadmap.',
-                                color: 'var(--accent-blue)', tag: 'Resume · Market AI'
-                            },
-                            {
-                                id: 'TEACHER', icon: '🎓', name: 'AI Teacher',
-                                tagline: 'Guided subtopic-by-subtopic learning across all domains. Ask doubts, get Groq AI explanations, download professional PDF notes.',
-                                color: 'var(--primary-500)', tag: 'Guided Learning · PDF Notes'
-                            },
-                            {
-                                id: 'QUIZ', icon: '📝', name: 'Quiz Master',
-                                tagline: 'Adaptive AI-generated quizzes across your domain. Instant feedback, scoring, and weak topic detection.',
-                                color: 'var(--accent-pink)', tag: 'Assessments · Analytics'
-                            },
-                            {
-                                id: 'CODING_MENTOR', icon: '💻', name: 'Coding Mentor',
-                                tagline: 'Paste code for deep review, bug detection, optimization suggestions, and complexity analysis by AI.',
-                                color: 'var(--accent-green)', tag: 'Code Review · Debug'
-                            },
-                            {
-                                id: 'ROADMAP', icon: '🗺️', name: 'Career Pathfinder',
-                                tagline: 'Upload resume + target city → AI fetches live job demand, skill gaps, live job links, and a step-by-step career strategy.',
-                                color: 'var(--accent-teal)', tag: 'Market · Jobs · Strategy'
-                            },
-                        ].map(mod => (
-                            <div
-                                key={mod.id}
-                                className="glass-card hover-lift"
-                                style={{ padding: '1.5rem', cursor: 'pointer', border: `1px solid ${mod.color}25`, transition: 'all 0.3s ease' }}
-                                onClick={() => onSelectModule(mod.id)}
-                            >
-                                <div className="flex items-center gap-md" style={{ marginBottom: '0.75rem' }}>
-                                    <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: `${mod.color}15`, border: `1px solid ${mod.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
-                                        {mod.icon}
-                                    </div>
-                                    <div>
-                                        <h4 style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>{mod.name}</h4>
-                                        <span style={{ fontSize: '0.62rem', color: mod.color, fontWeight: 700, letterSpacing: '0.3px' }}>{mod.tag}</span>
-                                    </div>
+                            { label: 'Quiz Accuracy', val: stats?.quiz_accuracy || 0, icon: '🎯', color: '#3b82f6' },
+                            { label: 'Interview Readiness', val: stats?.interview_score || 0, icon: '👔', color: '#8b5cf6' },
+                            { label: 'Code Optimization', val: stats?.code_optimization || 0, icon: '⚡', color: '#10b981' }
+                        ].map(s => (
+                            <div key={s.label} className="glass-card" style={{ 
+                                padding: '1.75rem 2rem', background: 'white', border: '1px solid #f1f5f9',
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.02)', borderRadius: '24px'
+                            }}>
+                                <div className="flex items-center gap-sm mb-lg">
+                                    <div style={{ 
+                                        width: '32px', height: '32px', borderRadius: '8px', background: `${s.color}10`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem'
+                                    }}>{s.icon}</div>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>{s.label}</span>
                                 </div>
-                                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '1rem' }}>
-                                    {mod.tagline}
-                                </p>
-                                <div className="flex justify-between items-center">
-                                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 800 }}>CLICK TO LAUNCH</span>
-                                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: mod.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.85rem' }}>→</div>
+                                <h3 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#0f172a', margin: '0 0 1.25rem' }}>{s.val}%</h3>
+                                <div style={{ height: '6px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${s.val}%`, background: s.color, borderRadius: '100px' }}></div>
                                 </div>
                             </div>
                         ))}
                     </div>
 
+                    {/* 🧩 3. Modules Launchpad */}
+                    <div className="flex-col gap-lg">
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Modules</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+                            {[
+                                { id: 'INTERVIEWER', name: 'Interview Coach', desc: 'Ace every interview', icon: '🎤' },
+                                { id: 'TEACHER', name: 'AI Teacher', desc: 'Learn anything', icon: '🎓' },
+                                { id: 'QUIZ', name: 'Quiz Master', desc: 'Test your knowledge', icon: '📝' }
+                            ].map(m => (
+                                <div 
+                                    key={m.id}
+                                    onClick={() => onSelectModule(m.id)}
+                                    className="glass-card hover-lift"
+                                    style={{ 
+                                        padding: '1.5rem', background: 'white', border: '1px solid #f1f5f9',
+                                        borderRadius: '24px', cursor: 'pointer', display: 'flex', 
+                                        alignItems: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.01)'
+                                    }}
+                                >
+                                    <div style={{ 
+                                        width: '48px', height: '48px', borderRadius: '12px', background: '#eff6ff',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem',
+                                        marginRight: '1rem'
+                                    }}>{m.icon}</div>
+                                    <div style={{ flex: 1 }}>
+                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>{m.name}</h4>
+                                        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>{m.desc}</p>
+                                    </div>
+                                    <span style={{ color: '#cbd5e1', fontSize: '1rem' }}>›</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+                            {[
+                                { id: 'CODING_MENTOR', name: 'Coding Mentor', desc: 'Master the code', icon: '💻' },
+                                { id: 'ROADMAP', name: 'Career Pathfinder', desc: 'Navigate your career', icon: '🗺️' }
+                            ].map(m => (
+                                <div 
+                                    key={m.id}
+                                    onClick={() => onSelectModule(m.id)}
+                                    className="glass-card hover-lift"
+                                    style={{ 
+                                        padding: '1.5rem', background: 'white', border: '1px solid #f1f5f9',
+                                        borderRadius: '24px', cursor: 'pointer', display: 'flex', 
+                                        alignItems: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.01)'
+                                    }}
+                                >
+                                    <div style={{ 
+                                        width: '48px', height: '48px', borderRadius: '12px', background: '#eff6ff',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem',
+                                        marginRight: '1rem'
+                                    }}>{m.icon}</div>
+                                    <div style={{ flex: 1 }}>
+                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>{m.name}</h4>
+                                        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>{m.desc}</p>
+                                    </div>
+                                    <span style={{ color: '#cbd5e1', fontSize: '1rem' }}>›</span>
+                                </div>
+                            ))}
+                            <div style={{ opacity: 0, pointerEvents: 'none' }}></div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Sidebar */}
+                {/* 🛡️ 4. Sidebar: Activity & Tracking */}
                 <aside className="flex-col gap-lg">
-                    <RoadmapSelector />
-                    <div className="glass-card" style={{ padding: '1.5rem' }}>
-                        <h4 style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1.5rem', color: 'var(--primary-400)' }}>Rewards & Milestones</h4>
-                        <div className="flex-col gap-md">
-                            <div className="flex-col gap-xs">
-                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 800 }}>EARNED BADGES</span>
-                                <div className="flex flex-wrap gap-xs">
-                                    {(progress?.badges || ['Learner']).map((b: string) => (
-                                        <span key={b} className="badge" style={{ fontSize: '0.55rem', background: 'rgba(52, 160, 90, 0.10)', borderColor: 'var(--primary-500)' }}>★ {b}</span>
-                                    ))}
+                    {/* Floating Operation Status Badge */}
+                    <div style={{ 
+                        background: 'white', border: '1px solid #f1f5f9', color: '#0f172a',
+                        padding: '0.6rem 1.4rem', borderRadius: '100px', fontSize: '0.72rem', 
+                        fontWeight: 800, display: 'flex', alignItems: 'center', gap: '10px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: 'fit-content', margin: '0 0 -0.5rem 0.5rem'
+                    }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                            <circle cx="12" cy="12" r="10" stroke="#22c55e" fill="transparent" strokeWidth="2" />
+                        </svg>
+                        SYSTEM STATUS: OPERATIONAL
+                    </div>
+
+                    {/* Collapsible Roadmaps Section */}
+                    <div className="glass-card" style={{ padding: '2rem', background: 'white', border: '1px solid #f1f5f9', borderRadius: '24px' }}>
+                        <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.5rem' }}>Roadmaps</h4>
+                        <div className="flex-col gap-sm">
+                            {CURRICULUM_DATA.map((roadmap) => (
+                                <div key={roadmap.id} className="flex-col">
+                                    <button 
+                                        onClick={() => setExpandedRoadmap(expandedRoadmap === roadmap.id ? null : roadmap.id)}
+                                        style={{ 
+                                            display: 'flex', alignItems: 'center', gap: '8px', 
+                                            padding: '0.6rem 0', border: 'none', background: 'none',
+                                            cursor: 'pointer', width: '100%', textAlign: 'left'
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '0.7rem', color: '#94a3b8', transition: 'transform 0.2s', transform: expandedRoadmap === roadmap.id ? 'rotate(90deg)' : 'none' }}>›</span>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: expandedRoadmap === roadmap.id ? 700 : 600, color: expandedRoadmap === roadmap.id ? '#3b82f6' : '#64748b' }}>
+                                            {roadmap.title}
+                                        </span>
+                                    </button>
+                                    
+                                    {expandedRoadmap === roadmap.id && (
+                                        <div className="flex-col gap-md fade-in" style={{ padding: '0.5rem 0 0.75rem 1.75rem', borderLeft: '1px solid #f1f5f9', marginLeft: '4px' }}>
+                                            {roadmap.phases.map((phase: any) => (
+                                                <div key={phase.name} className="flex-col gap-xs">
+                                                    <span style={{ fontSize: '0.8rem', color: '#1e293b', fontWeight: 700 }}>{phase.name}</span>
+                                                    <div className="flex-col gap-xs">
+                                                        {phase.milestones.map((m: any) => (
+                                                            <span key={m.title} style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{m.title}</span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                            <div className="flex-col gap-xs">
-                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 800 }}>STUDY STREAK</span>
-                                <div className="flex items-end gap-sm">
-                                    <span style={{ fontSize: '2rem', fontWeight: 900 }}>🔥 4</span>
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Days</span>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
 
-                    <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid var(--accent-blue)', background: 'rgba(0, 150, 255, 0.02)' }}>
-                        <h4 style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem', color: 'var(--accent-blue)' }}>Next Objective</h4>
-                        <p style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem' }}>Resume Domain Polish</p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                            Your {profile?.domain} profile is 85% complete. Analyze your resume in the Interview Coach to unlock the "Specialist" badge.
+                    {/* Rewards Card */}
+                    <div className="glass-card" style={{ padding: '1.75rem 2rem', background: 'white', border: '1px solid #f1f5f9', borderRadius: '24px' }}>
+                        <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.25rem' }}>Rewards</h4>
+                        <div className="flex-col gap-md">
+                            <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>No badges yet</p>
+                            <span style={{ fontSize: '1rem', fontWeight: 900, color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                ⚡ 0 day streak
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Next Objective Card */}
+                    <div className="glass-card" style={{ padding: '2rem', background: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '24px' }}>
+                        <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#3b82f6', marginBottom: '1rem' }}>Next Objective</h4>
+                        <p style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+                            Complete your first quiz to unlock adaptive learning paths.
                         </p>
-                        <button
-                            className="btn btn-primary w-full"
-                            style={{ marginTop: '1rem', padding: '0.5rem', fontSize: '0.75rem' }}
-                            onClick={() => onSelectModule('INTERVIEWER')}
+                        <button 
+                            onClick={() => onSelectModule('QUIZ')}
+                            className="btn btn-primary" 
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', fontSize: '0.85rem' }}
                         >
                             Start Analysis
                         </button>

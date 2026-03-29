@@ -62,7 +62,7 @@ export const Assistant = () => {
             case 'pathfinder':
                 return <CareerPathfinder />;
             case 'teacher':
-                return <Teacher />;
+                return <Teacher onSelectModule={setView} />;
             case 'stats':
                 return <Analytics stats={stats} fetchStats={fetchStats} />;
             case 'chat':
@@ -108,8 +108,8 @@ export const Assistant = () => {
                     />
                 )}
 
-                <div className="flex items-center gap-md mb-xl">
-                    {view !== 'dashboard' && (
+                {view !== 'dashboard' && (
+                    <div className="flex items-center gap-md mb-xl">
                         <button
                             onClick={() => setView('dashboard')}
                             className="btn btn-secondary"
@@ -117,11 +117,8 @@ export const Assistant = () => {
                         >
                             ← Back to Dashboard
                         </button>
-                    )}
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>
-                        SYSTEM_STATUS: <span style={{ color: 'var(--accent-green)' }}>OPERATIONAL</span>
-                    </span>
-                </div>
+                    </div>
+                )}
 
                 {renderContent()}
 

@@ -237,7 +237,7 @@ interface Explanation {
     video_url?: string;
 }
 
-export const Teacher = () => {
+export const Teacher = ({ onSelectModule }: any) => {
     // Step 1: pick domain
     const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap | null>(null);
     const [profileDomain, setProfileDomain] = useState<string | null>(null);
@@ -289,22 +289,14 @@ export const Teacher = () => {
                 
                 if (data.profile?.domain) {
                     setProfileDomain(data.profile.domain);
-                    const matched = CURRICULUM_DATA.find(r => r.title === data.profile.domain);
-                    if (matched) {
-                        console.log("Auto-selecting roadmap:", matched.title);
-                        setSelectedRoadmap(matched);
-                        loadExplanation(matched, 0, 0);
-                    }
                 }
             } catch (err) {
                 console.error("Error loading profile:", err);
             }
         };
 
-        if (!selectedRoadmap) {
-            initFromProfile();
-        }
-    }, [selectedRoadmap]);
+        initFromProfile();
+    }, []);
 
     const phase = selectedRoadmap?.phases[phaseIdx];
     const milestone = phase?.milestones[milestoneIdx];
@@ -502,28 +494,50 @@ export const Teacher = () => {
     // Render inline markdown: **bold**, `code`, mixed text
     const renderInline = (text: string) => {
         if (!text) return null;
-        const normalizedText = normalizeLatexText(text);
         const parts: React.ReactNode[] = [];
-        // Split on **bold**, `code`, $latex$, and \(inline math\)
-        const regex = /(\*\*[^*]+\*\*|`[^`]+`|\$[^\$]+\$|\\\([^\)]+\\\))/g;
+        
+        const regex = /(\*\*[^*]+\*\*|`[^`]+`|\$(?:[^\$]|\\\$)+\$|\\\(.*?\\\))/g;
+        
         let last = 0, m;
         let key = 0;
-        while ((m = regex.exec(normalizedText)) !== null) {
-            if (m.index > last) parts.push(<span key={key++}>{normalizedText.slice(last, m.index)}</span>);
+        while ((m = regex.exec(text)) !== null) {
+            if (m.index > last) {
+                const plainText = text.slice(last, m.index);
+                parts.push(<span key={key++}>{normalizeLatexText(plainText)}</span>);
+            }
+            
             const token = m[0];
             if (token.startsWith('**')) {
                 parts.push(<strong key={key++} style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{token.slice(2, -2)}</strong>);
             } else if (token.startsWith('`')) {
                 parts.push(<code key={key++} style={{ background: 'rgba(100,130,255,0.12)', color: 'var(--primary-700)', padding: '1px 5px', borderRadius: '4px', fontSize: '0.85em', fontFamily: 'monospace' }}>{token.slice(1, -1)}</code>);
             } else if (token.startsWith('$')) {
-                parts.push(<InlineMath key={key++} math={token.slice(1, -1)} />);
+                const math = token.slice(1, -1).trim();
+                if (math) {
+                    try {
+                        parts.push(<InlineMath key={key++} math={math} />);
+                    } catch {
+                        parts.push(<span key={key++} style={{ color: 'var(--accent-red)' }}>${math}$</span>);
+                    }
+                }
             } else if (token.startsWith('\\(')) {
-                parts.push(<InlineMath key={key++} math={token.slice(2, -2)} />);
+                const math = token.slice(2, -2).trim();
+                if (math) {
+                    try {
+                        parts.push(<InlineMath key={key++} math={math} />);
+                    } catch {
+                        parts.push(<span key={key++} style={{ color: 'var(--accent-red)' }}>({math})</span>);
+                    }
+                }
             }
             last = m.index + token.length;
         }
-        if (last < normalizedText.length) parts.push(<span key={key++}>{normalizedText.slice(last)}</span>);
-        return parts;
+        
+        if (last < text.length) {
+            parts.push(<span key={key++}>{normalizeLatexText(text.slice(last))}</span>);
+        }
+        
+        return parts.length > 0 ? parts : [normalizeLatexText(text)];
     };
 
     const formatExplanation = (text: string) => {
@@ -557,24 +571,50 @@ export const Teacher = () => {
                 i++; continue;
             }
 
-            // --- Block Math: $$ ... $$ or \begin{env} ... \end{env} ---
-            if (line.trim().startsWith('$$') || line.trim().startsWith('\\begin{')) {
+            // --- Block Math: $$ ... $$ or \begin{env} ... \end{env} or \[ ... \] ---
+            if (line.trim().startsWith('$$') || line.trim().startsWith('\\begin{') || line.trim().startsWith('\\[')) {
                 let mathContent = "";
                 
                 if (line.trim().startsWith('$$')) {
-                    mathContent = line.trim().slice(2);
-                    if (mathContent.endsWith('$$')) {
-                        mathContent = mathContent.slice(0, -2);
+                    const trimmedLine = line.trim();
+                    // Case 1: All on one line $$ ... $$
+                    if (trimmedLine.length > 4 && trimmedLine.endsWith('$$')) {
+                        mathContent = trimmedLine.slice(2, -2);
                     } else {
+                        // Case 2: Multi-line $$ ...
+                        mathContent = trimmedLine.slice(2);
                         const mathLines: string[] = [mathContent];
                         i++;
-                        while (i < lines.length && !lines[i].trim().endsWith('$$')) {
-                            mathLines.push(lines[i]);
-                            i++;
+                        while (i < lines.length) {
+                             const l = lines[i].trim();
+                             if (l.endsWith('$$')) {
+                                 mathLines.push(l.slice(0, -2));
+                                 break;
+                             }
+                             mathLines.push(lines[i]);
+                             i++;
                         }
-                        if (i < lines.length) {
-                             const lastLine = lines[i].trim();
-                             mathLines.push(lastLine.slice(0, -2));
+                        // If we never found an ending $$, we should probably treat it as a false positive
+                        // for BlockMath and just render normally, but AI usually just forgets the end.
+                        mathContent = mathLines.join('\n');
+                    }
+                } else if (line.trim().startsWith('\\[')) {
+                    // Handle \[ ... \] format
+                    const trimmedLine = line.trim();
+                    if (trimmedLine.endsWith('\\]')) {
+                        mathContent = trimmedLine.slice(2, -2);
+                    } else {
+                        mathContent = trimmedLine.slice(2);
+                        const mathLines: string[] = [mathContent];
+                        i++;
+                        while (i < lines.length) {
+                             const l = lines[i].trim();
+                             if (l.includes('\\]')) {
+                                 mathLines.push(l.split('\\]')[0]);
+                                 break;
+                             }
+                             mathLines.push(lines[i]);
+                             i++;
                         }
                         mathContent = mathLines.join('\n');
                     }
@@ -591,11 +631,15 @@ export const Teacher = () => {
                 }
                 
                 if (mathContent.trim()) {
-                    elements.push(
-                        <div key={`math-${i}`} className="math-block" style={{ margin: '1.5rem 0', textAlign: 'center', background: 'rgba(100,130,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
-                            <BlockMath math={mathContent} />
-                        </div>
-                    );
+                    try {
+                        elements.push(
+                            <div key={`math-${i}`} className="math-block" style={{ margin: '1.5rem 0', textAlign: 'center', background: 'rgba(100,130,255,0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(100,130,255,0.08)' }}>
+                                <BlockMath math={mathContent} />
+                            </div>
+                        );
+                    } catch {
+                        elements.push(<p key={`math-error-${i}`} style={{ color: 'var(--accent-red)', fontSize: '0.8rem' }}>Math Error: {mathContent.slice(0, 50)}...</p>);
+                    }
                 }
                 i++; continue;
             }
@@ -833,7 +877,13 @@ export const Teacher = () => {
                             )}
                         </div>
                         <div className="flex-col gap-sm">
-                            <button className="btn btn-primary w-full" onClick={() => { setShowRecovery(false); alert("Redirecting to targeted quiz..."); }}>
+                            <button className="btn btn-primary w-full" onClick={() => { 
+                                setShowRecovery(false); 
+                                if (onSelectModule) {
+                                    localStorage.setItem('pending_quiz_mode', 'targeted');
+                                    onSelectModule('quiz');
+                                }
+                            }}>
                                 Launch Targeted Quiz →
                             </button>
                             <button className="btn btn-secondary w-full" onClick={() => setShowRecovery(false)}>

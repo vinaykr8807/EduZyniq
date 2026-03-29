@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 import re
 import asyncio
 from contextlib import asynccontextmanager
@@ -287,7 +287,18 @@ def save_profile(profile: StudentProfileSchema, user_email: str):
 def get_user_profile(user_email: str):
     user_result = supabase.table('users').select('id').eq('email', user_email).execute()
     if not user_result.data:
-        raise HTTPException(status_code=404, detail="User not found")
+        # Return a guest/empty profile instead of 404 to avoid frontend errors
+        return {
+            "profile": {
+                "degree": "B.Tech",
+                "branch": "Computer Science",
+                "academic_year": "Final Year",
+                "domain": "Full-stack Developer",
+                "skills": ["JavaScript", "React", "Python", "SQL"]
+            },
+            "has_stored_resume": False,
+            "is_guest": True
+        }
     
     user_id = user_result.data[0]['id']
     profile_result = supabase.table('student_profiles').select('*').eq('user_id', user_id).execute()
@@ -298,7 +309,8 @@ def get_user_profile(user_email: str):
     profile = profile_result.data[0] if profile_result.data else None
     return {
         "profile": profile,
-        "has_stored_resume": resume_status.get("has_stored_resume", False)
+        "has_stored_resume": resume_status.get("has_stored_resume", False),
+        "is_guest": False
     }
 
 @app.get("/student/progress")
@@ -706,6 +718,18 @@ def run_job_crawler_manual():
         print(f"❌ [Crawler] Error: {e}")
         return {"success": False, "error": str(e)}
 
+@app.post("/generate-quiz")
+def post_quiz_endpoint(
+    subject: str = Form(...), 
+    topic: str = Form(...), 
+    difficulty: str = Form(...), 
+    mode: str = Form("standard"), 
+    domain: Optional[str] = Form(None), 
+    subtopic: Optional[str] = Form(None)
+):
+    from assistants.quiz_master import generate_dynamic_quiz
+    return generate_dynamic_quiz(subject, topic, difficulty, mode, domain, subtopic)
+
 @app.get("/generate-quiz")
 def get_quiz_endpoint(subject: str, topic: str, difficulty: str, mode: str = "standard", domain: Optional[str] = None, subtopic: Optional[str] = None):
     from assistants.quiz_master import generate_dynamic_quiz
@@ -953,7 +977,7 @@ class TeacherExplainRequest(BaseModel):
     has_doubt: bool = False
     doubt_text: Optional[str] = None
     user_email: Optional[str] = None
-    history: Optional[List[dict]] = [] # [{role: "user", content: "..."}]
+    history: Optional[List[Any]] = []
 
 class MarketSkillsRequest(BaseModel):
     role: str
@@ -1156,7 +1180,8 @@ def list_student_notes(user_email: str):
     try:
         user_result = supabase.table('users').select('id').eq('email', user_email).execute()
         if not user_result.data:
-            raise HTTPException(status_code=404, detail="User not found")
+            # Return empty notes for guest users instead of 404
+            return {"notes": [], "count": 0, "is_guest": True}
         user_id = user_result.data[0]['id']
         folder = f"notes/{user_id}"
 
@@ -1190,6 +1215,37 @@ def list_student_notes(user_email: str):
     except Exception as e:
         print(f"List notes error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class JobSubscribeReq(BaseModel):
+    user_email: str
+    role: str
+    city: str
+    min_score: int = 85
+
+@app.post("/job-agent/subscribe")
+def subscribe_job_agent(req: JobSubscribeReq):
+    """Subscribe user to daily AI job scanning."""
+    try:
+        # Get user ID
+        user_res = supabase.table('users').select('id').eq('email', req.user_email).execute()
+        if not user_res.data:
+            return {"success": False, "error": "User not found"}
+        user_id = user_res.data[0]['id']
+        
+        # Upsert subscription
+        supabase.table('job_notifications').upsert({
+            'user_id': user_id,
+            'role': req.role,
+            'city': req.city,
+            'min_score': req.min_score,
+            'is_active': True,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }, on_conflict='user_id').execute()
+        
+        return {"success": True}
+    except Exception as e:
+        print(f"Subscription error: {e}")
+        return {"success": False, "error": str(e)}
 
 @app.get("/admin/market-insights")
 def admin_market_insights():
