@@ -175,36 +175,50 @@ export const QuizMaster = ({ onComplete }: any) => {
         }
     };
 
-    const calculateScore = () => {
+    const calculateScore = (ans: Record<number, string> = answers) => {
         if (!quiz || quiz.length === 0) return 0;
         let correct = 0;
         quiz.forEach((q, i) => {
+            const userAns = ans[i];
             if (q.type === 'matching' && q.matching_pairs) {
-                const userMatches = JSON.parse(answers[i] || '{}');
-                const totalPairs = Object.keys(q.matching_pairs).length;
-                let correctPairs = 0;
-                Object.entries(q.matching_pairs).forEach(([k, v]) => {
-                    if (userMatches[k] === v) correctPairs++;
-                });
-                if (correctPairs === totalPairs) correct++;
-            } else if (answers[i] === q.answer) {
+                try {
+                    const userMatches = JSON.parse(userAns || '{}');
+                    const totalPairs = Object.keys(q.matching_pairs).length;
+                    let correctPairs = 0;
+                    Object.entries(q.matching_pairs).forEach(([k, v]) => {
+                        if (userMatches[k] === v) correctPairs++;
+                    });
+                    if (correctPairs === totalPairs) correct++;
+                } catch { }
+            } else if (userAns === q.answer) {
                 correct++;
             }
         });
         return Math.round((correct / quiz.length) * 100);
     };
 
-    const nextQuestion = async () => {
+    const skipQuestion = () => {
+        const updatedAnswers = { ...answers, [currentIndex]: "SKIPPED" };
+        setAnswers(updatedAnswers);
+        advanceQuiz(updatedAnswers);
+    };
+
+    const nextQuestion = () => {
         if (quiz && quiz[currentIndex].type === 'matching') {
-             // Validate if all matched
              const totalToMatch = Object.keys(quiz[currentIndex].matching_pairs || {}).length;
              if (Object.keys(tempMatches).length < totalToMatch) {
-                 alert("Please finish all matches before submtitting!");
+                 alert("Please finish all matches before submitting!");
                  return;
              }
-             setAnswers(prev => ({ ...prev, [currentIndex]: JSON.stringify(tempMatches) }));
+             const updatedAnswers = { ...answers, [currentIndex]: JSON.stringify(tempMatches) };
+             setAnswers(updatedAnswers);
+             advanceQuiz(updatedAnswers);
+        } else {
+             advanceQuiz(answers);
         }
+    };
 
+    const advanceQuiz = async (currentAnswers: Record<number, string>) => {
         if (quiz && currentIndex < quiz.length - 1) {
             setCurrentIndex(currentIndex + 1);
             setMatchingState({ left: null, right: null });
@@ -212,23 +226,26 @@ export const QuizMaster = ({ onComplete }: any) => {
         } else {
             setIsFinished(true);
             setIsAnalyzing(true);
-            const score = calculateScore();
+            const score = calculateScore(currentAnswers);
             const avgConfidence = Object.values(confidenceValues).length > 0 
                 ? Object.values(confidenceValues).reduce((a, b) => a + b, 0) / Object.values(confidenceValues).length
                 : 0;
 
             const results = quiz?.map((q, i) => {
                 let is_correct = false;
+                const userAns = currentAnswers[i];
                 if (q.type === 'matching' && q.matching_pairs) {
-                    const userMatches = JSON.parse(answers[i] || '{}');
-                    const totalPairs = Object.keys(q.matching_pairs).length;
-                    let correctPairs = 0;
-                    Object.entries(q.matching_pairs).forEach(([k, v]) => {
-                        if (userMatches[k] === v) correctPairs++;
-                    });
-                    is_correct = correctPairs === totalPairs;
+                    try {
+                        const userMatches = JSON.parse(userAns || '{}');
+                        const totalPairs = Object.keys(q.matching_pairs).length;
+                        let correctPairs = 0;
+                        Object.entries(q.matching_pairs).forEach(([k, v]) => {
+                            if (userMatches[k] === v) correctPairs++;
+                        });
+                        is_correct = correctPairs === totalPairs;
+                    } catch { is_correct = false; }
                 } else {
-                    is_correct = answers[i] === q.answer;
+                    is_correct = userAns === q.answer;
                 }
 
                 return {
@@ -236,7 +253,7 @@ export const QuizMaster = ({ onComplete }: any) => {
                     topic_tag: q.topic_tag || 'Core Concept',
                     is_correct: is_correct,
                     explanation: q.explanation,
-                    user_answer: answers[i],
+                    user_answer: userAns,
                     correct_answer: q.answer
                 };
             });
@@ -706,9 +723,18 @@ export const QuizMaster = ({ onComplete }: any) => {
                                          <span>Certain</span>
                                      </div>
                                 </div>
-                                <button className="btn btn-primary" onClick={nextQuestion} disabled={quiz[currentIndex].type !== 'matching' && !answers[currentIndex]} style={{ minWidth: '180px' }}>
-                                    {currentIndex === quiz.length - 1 ? 'FINISH ASSESSMENT' : 'NEXT QUESTION →'}
-                                </button>
+                                <div className="flex gap-md">
+                                    <button 
+                                        className="btn btn-secondary" 
+                                        onClick={skipQuestion}
+                                        style={{ minWidth: '120px' }}
+                                    >
+                                        SKIP
+                                    </button>
+                                    <button className="btn btn-primary" onClick={nextQuestion} disabled={quiz[currentIndex].type !== 'matching' && !answers[currentIndex]} style={{ minWidth: '180px' }}>
+                                        {currentIndex === quiz.length - 1 ? 'FINISH ASSESSMENT' : 'NEXT QUESTION →'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
