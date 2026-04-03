@@ -62,7 +62,7 @@ export const Assistant = () => {
             case 'pathfinder':
                 return <CareerPathfinder />;
             case 'teacher':
-                return <Teacher onSelectModule={setView} />;
+                return <Teacher />;
             case 'stats':
                 return <Analytics stats={stats} fetchStats={fetchStats} />;
             case 'chat':
