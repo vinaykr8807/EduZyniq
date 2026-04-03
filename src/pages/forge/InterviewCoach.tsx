@@ -1137,9 +1137,9 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
                                                     {currentQuestion.expected_key_points?.length > 0 && (
                                                         <div style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', padding: '0.85rem 1rem', borderRadius: '8px' }}>
-                                                            <p style={{ fontSize: '0.68rem', color: '#a78bfa', fontWeight: 900 }}>WHAT INTERVIEWERS LOOK FOR:</p>
+                                                            <p style={{ fontSize: '0.68rem', color: '#1e40af', fontWeight: 900 }}>WHAT INTERVIEWERS LOOK FOR:</p>
                                                             <div className="flex flex-wrap gap-xs" style={{ marginTop: '0.5rem' }}>
-                                                                {currentQuestion.expected_key_points.map((kp: string) => <span key={kp} className="badge" style={{ fontSize: '0.7rem', borderColor: 'rgba(139,92,246,0.3)', color: '#c4b5fd' }}>{kp}</span>)}
+                                                                {currentQuestion.expected_key_points.map((kp: string) => <span key={kp} className="badge" style={{ fontSize: '0.7rem', borderColor: 'rgba(139,92,246,0.3)', color: '#1e40af' }}>{kp}</span>)}
                                                             </div>
                                                         </div>
                                                     )}
