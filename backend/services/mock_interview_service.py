@@ -254,11 +254,11 @@ def generate_mock_question(
 
     if is_project_round:
         prompt = f"""
-You are a senior technical interviewer hiring a {role}.
+You are a senior technical interviewer assessing a candidate for a {role} role.
 The candidate listed the following projects on their resume: {projects_str}
 
-Your job is to ask a SPECIFIC, DEEP question about one of these real projects.
-Do NOT ask generic questions. Reference the actual project or technology they used.
+Your job is to ask a SPECIFIC, DEEP question about one of these real projects that relates to their target role as a {role}.
+Do NOT ask generic questions. Reference the actual project or technology they used, but frame it around the expectations for a {role}.
 
 Focus project/skill: {plan_item.get('skill', 'their main project')}
 Difficulty: {effective_difficulty}
@@ -268,10 +268,10 @@ Already asked (DO NOT REPEAT):
 
 Return ONLY valid JSON:
 {{
-  "question": "A direct, specific question referencing the candidate's actual project or technology they built.",
+  "question": "A direct, specific question referencing the candidate's actual project, contextualized for a {role} position.",
   "category": "project",
   "difficulty": "{effective_difficulty}",
-  "expected_key_points": ["Technical depth", "Design decisions", "Challenges overcome", "Outcome & impact"]
+  "expected_key_points": ["Technical depth", "Design decisions", "Challenges overcome", "Relevance to role"]
 }}
 """
         res = _llm(prompt, 0.6)
@@ -280,36 +280,34 @@ Return ONLY valid JSON:
 
     # ── Standard/Technical/Behavioral question path ───────────────────────
     prompt = f"""
-You are a senior technical interviewer hiring a {role} in the {domain} domain.
+You are a senior technical interviewer assessing a candidate for a {role} role in the {domain} domain.
 
-CANDIDATE PROFILE (from their uploaded resume):
-- Skills on Resume : {resume_skills}
-- Resume Projects  : {projects_str}
-- Skill Gaps       : {missing}
-- ATS Score        : {ats_score}
-- Past Weak Areas  : {', '.join(past_weak) or 'None'}
+IMPORTANT CONTEXT (STRICTLY FROM RESUME):
+- Candidate Skills   : {resume_skills}
+- Projects Built     : {projects_str}
+- Resume ATS Score   : {ats_score}
+- Past Mistakes      : {', '.join(past_weak) or 'None'}
 
 INTERVIEW STEP:
-- Type       : {plan_item['type']}
-- Focus Skill: {plan_item['skill']}
-- Note       : {plan_item.get('note', 'N/A')}
-- Difficulty : {effective_difficulty}
+- Current Round : {plan_item['type']}
+- Skill/Topic   : {plan_item.get('skill', 'General')}
+- Logic Note    : {plan_item.get('note', 'N/A')}
+- Difficulty    : {effective_difficulty}
 
-STRICT RULES:
-1. Ask ONLY about the candidate's resume (skills they listed, projects they built).
-2. DO NOT ask about job postings, company requirements, or external market trends.
-3. If type is "project" or note mentions a project, reference it by name.
-4. If Note = "Skill-Gap Audit" — probe how the candidate would learn or compensate for a gap.
-5. If Note = "Past-mistake focus" — revisit the weak area from a new angle.
-6. Keep question concise (1–3 sentences max).
-7. NEVER repeat: {json.dumps(asked)}
+STRICT INSTRUCTIONS:
+1. ASSESS FOR TARGET ROLE: The question MUST be highly relevant to the core responsibilities of a {role}.
+2. PERSONALIZE USING RESUME: Contextualize the question by explicitly referencing their listed skills or projects. For example, ask how they would apply a concept they used in [Project] to a complex {role} scenario.
+3. NO GENERIC JOB DRIFT: Do not reference "our company needs" or "job descriptions". Maintain the persona of a practical technical evaluator.
+4. If the note is "Skill-Gap Audit", challenge them on a technology they are missing but that a {role} needs.
+5. Keep questions concise and professional (2 sentences max).
+6. Avoid repetition: {json.dumps(asked)}
 
 Return ONLY valid JSON:
 {{
-  "question": "...",
+  "question": "A direct, technically deep question evaluating them for a {role} while referencing one of their actual projects or listed skills.",
   "category": "{plan_item['type']}",
   "difficulty": "{effective_difficulty}",
-  "expected_key_points": ["point1", "point2", "point3"]
+  "expected_key_points": ["Specific technical detail", "Reasoning", "Impact"]
 }}
 """
     res = _llm(prompt, 0.6)

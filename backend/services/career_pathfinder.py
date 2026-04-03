@@ -532,12 +532,13 @@ def _extract_deep_resume_insights(text: str, role: str) -> List[str]:
     client = Groq(api_key=groq_key)
     prompt = f"""
     Analyze the following resume text specifically for a candidate targeting a '{role}' position.
-    Extract a comprehensive list of technical skills, frameworks, and methodologies mentioned or STRONGLY implied by their projects and experience.
+    Extract a comprehensive list of technical skills, frameworks, and methodologies EXPLICITLY mentioned in their projects, experience, and skills sections.
     
     Resume Text: "{text[:4000]}"
     
     Output ONLY a JSON array of skill strings like ["React", "FastAPI", "Docker", "System Design"].
-    Focus on high-value skills relevant to the target role.
+    Do NOT include skills that are only 'implied' or 'expected' for the role but not listed.
+    Focus only on what is actually present in the text.
     """
     
     try:

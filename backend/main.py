@@ -22,6 +22,13 @@ from services.historical_market_data import historical_service, risk_service
 from services.notification_service import notification_service
 from services.mock_interview_service import build_mock_plan, generate_mock_question, evaluate_mock_answer, evaluate_coding_answer, run_code_against_tests, save_mock_session
 
+import redis
+try:
+    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    redis_client.ping()
+except Exception as e:
+    redis_client = None
+
 app = FastAPI()
 
 app.add_middleware(
@@ -322,39 +329,98 @@ def get_progress(user_email: str):
     user_id = user_result.data[0]['id']
     prog_result = supabase.table('user_progress').select('*').eq('user_id', user_id).execute()
     
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+
     if not prog_result.data:
         try:
             new_prog = supabase.table('user_progress').insert({
                 'user_id': user_id,
                 'points': 0,
                 'level': 1,
-                'streak_days': 0,
+                'streak_days': 1,
                 'badges': [],
-                'career_phase': 'Foundational'
+                'career_phase': 'Foundational',
+                'last_active': now.isoformat()
             }).execute()
             prog = new_prog.data[0] if new_prog.data else {
-                'id': user_id, 'points': 0, 'level': 1, 'streak_days': 0,
-                'badges': [], 'career_phase': 'Foundational', 'last_active': None
+                'id': user_id, 'points': 0, 'level': 1, 'streak_days': 1,
+                'badges': [], 'career_phase': 'Foundational', 'last_active': now.isoformat()
             }
         except Exception as e:
             print(f"Progress Init Error: {e}")
             prog = {
-                'id': user_id, 'points': 0, 'level': 1, 'streak_days': 0,
-                'badges': [], 'career_phase': 'Foundational', 'last_active': None
+                'id': user_id, 'points': 0, 'level': 1, 'streak_days': 1,
+                'badges': [], 'career_phase': 'Foundational', 'last_active': now.isoformat()
             }
     else:
         prog = prog_result.data[0]
+        
+    # Auto-calculate gamification and update if necessary
+    points = prog.get('points', 0)
+    level_calculated = max(1, (points // 50) + 1)
     
+    badges = set(prog.get('badges') or [])
+    if points >= 50: badges.add("Apprentice")
+    if points >= 150: badges.add("Dedicated Learner")
+    if points >= 300: badges.add("Code Ninja")
+    if points >= 600: badges.add("Tech Wizard")
+    
+    streak = prog.get('streak_days', 0)
+    last_active_str = prog.get('last_active')
+    
+    needs_update = False
+    
+    if last_active_str:
+        try:
+            # Parse handle with/without timezone
+            las = last_active_str.replace("Z", "+00:00")
+            last_active = datetime.fromisoformat(las)
+            days_diff = (now.date() - last_active.date()).days
+            
+            if days_diff == 1:
+                streak += 1
+                needs_update = True
+            elif days_diff > 1:
+                streak = 1
+                needs_update = True
+        except ValueError:
+            streak = 1
+            needs_update = True
+    else:
+        streak = 1
+        needs_update = True
+
+    new_badges_list = list(badges)
+    
+    # Enforce chronological badge rarity ordering
+    badge_tier = {"Apprentice": 1, "Dedicated Learner": 2, "Code Ninja": 3, "Tech Wizard": 4}
+    new_badges_list.sort(key=lambda b: badge_tier.get(b, 5))
+    
+    if level_calculated != prog.get('level') or set(new_badges_list) != set(prog.get('badges') or []):
+        needs_update = True
+        
+    if needs_update:
+        try:
+            supabase.table('user_progress').update({
+                'level': level_calculated,
+                'streak_days': streak,
+                'badges': new_badges_list,
+                'last_active': now.isoformat()
+            }).eq('user_id', user_id).execute()
+        except Exception as e:
+            print(f"Error auto-updating gamification: {e}")
+            
     profile_result = supabase.table('student_profiles').select('*').eq('user_id', user_id).execute()
     
     return {
         "id": str(prog.get('id', user_id)),
-        "points": prog.get('points', 0),
-        "level": prog.get('level', 1),
-        "streak_days": prog.get('streak_days', 0),
-        "badges": prog.get('badges', []),
+        "points": points,
+        "level": level_calculated,
+        "streak_days": streak,
+        "badges": new_badges_list,
         "career_phase": prog.get('career_phase', 'Foundational'),
-        "last_active": prog.get('last_active'),
+        "last_active": now.isoformat(),
         "profile_completed": len(profile_result.data) > 0
     }
 
@@ -500,13 +566,21 @@ def get_analytics():
         total_optimizations = 0
         avg_optimization = None
 
+    # Quizzes
+    try:
+        quiz_rows = supabase.table('quiz_history').select('id').execute()
+        total_quizzes = len(quiz_rows.data)
+    except Exception:
+        total_quizzes = 0
+
     return {
         "total_students": len(users.data),
         "active_today": 0,
         "total_xp": total_xp,
         "total_interaction_hits": topics_completed,
         "total_interviews": total_interviews,
-        "total_optimizations": total_optimizations,
+        "total_optimizations": total_optimizations,  # Coding sessions completed
+        "total_quizzes": total_quizzes,
         "avg_readiness_score": avg_readiness,
         "avg_optimization_score": avg_optimization,
         "domain_distribution": domain_dist,
@@ -539,6 +613,10 @@ def get_student_performance():
             coding = supabase.table('coding_sessions').select('optimization_score').eq('user_id', uid).execute()
             avg_opt = round(float(sum(c['optimization_score'] for c in coding.data)) / max(len(coding.data), 1), 1) if coding.data else None
 
+            # Quizzes
+            qz = supabase.table('quiz_history').select('score').eq('user_id', uid).execute()
+            avg_quiz = round(float(sum(q['score'] for q in qz.data)) / max(len(qz.data), 1), 1) if qz.data else None
+
             result.append({
                 "user_id": uid,
                 "email": user.get('email'),
@@ -555,7 +633,9 @@ def get_student_performance():
                 "avg_readiness": round(float(sum(s['readiness_score'] for s in iv.data)) / max(len(iv.data), 1), 1) if iv.data else None,
                 "last_interview_role": iv.data[0]['role'] if iv.data else None,
                 "code_optimizations_done": len(coding.data),
-                "avg_optimization_score": avg_opt
+                "avg_optimization_score": avg_opt,
+                "quizzes_completed": len(qz.data),
+                "avg_quiz_score": avg_quiz
             })
         return {"students": result}
     except Exception as e:
@@ -983,6 +1063,13 @@ class TeacherExplainRequest(BaseModel):
     doubt_text: Optional[str] = None
     user_email: Optional[str] = None
     history: Optional[List[Any]] = []
+    force_regenerate: bool = False
+
+class TeacherCacheSaveRequest(BaseModel):
+    topic: str
+    subtopic: str
+    domain: str
+    explanation_data: dict
 
 class MarketSkillsRequest(BaseModel):
     role: str
@@ -1105,9 +1192,25 @@ def mock_save_session(req: MockSaveSessionReq):
 
 @app.post("/teacher/explain")
 def teacher_explain(req: TeacherExplainRequest):
-    """Groq-powered subtopic explanation. If has_doubt, answer the specific doubt."""
+    """Groq-powered subtopic explanation. Checks Redis cache first unless force_regenerate is True."""
     from services.personal_rag_service import save_teacher_interaction
+    import json
     
+    # Simple cache key based on topic and subtopic
+    cache_key = f"teacher_notes:{req.domain}:{req.topic}:{req.subtopic}"
+    cache_key = cache_key.replace(" ", "_").lower()
+
+    if not req.force_regenerate and not req.has_doubt and redis_client:
+        try:
+            cached_val = redis_client.get(cache_key)
+            if cached_val:
+                print(f"Cache hit for {cache_key}")
+                result = json.loads(cached_val)
+                # Ensure we return it as expected
+                return result
+        except Exception as e:
+            print(f"Redis get error: {e}")
+
     # 1. Generate explanation/answer
     result = explain_subtopic(
         req.topic, 
@@ -1130,6 +1233,24 @@ def teacher_explain(req: TeacherExplainRequest):
             save_teacher_interaction(req.user_email, "system", summary, supabase)
             
     return result
+
+@app.post("/teacher/save-cache")
+def teacher_save_cache(req: TeacherCacheSaveRequest):
+    """Explicitly save the approved AI notes into Redis cache."""
+    import json
+    if not redis_client:
+        return {"success": False, "error": "Redis not configured"}
+        
+    cache_key = f"teacher_notes:{req.domain}:{req.topic}:{req.subtopic}"
+    cache_key = cache_key.replace(" ", "_").lower()
+    
+    try:
+        redis_client.setex(cache_key, 604800, json.dumps(req.explanation_data)) # Cache for 7 days
+        print(f"Notes forcefully saved to cache: {cache_key}")
+        return {"success": True}
+    except Exception as e:
+        print(f"Redis set error: {e}")
+        return {"success": False, "error": str(e)}
 
 @app.post("/teacher/generate-notes")
 def teacher_generate_notes(req: TeacherExplainRequest):

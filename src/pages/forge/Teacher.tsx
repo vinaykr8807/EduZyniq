@@ -237,7 +237,7 @@ interface Explanation {
     video_url?: string;
 }
 
-export const Teacher = ({ onSelectModule }: any) => {
+export const Teacher = () => {
     // Step 1: pick domain
     const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap | null>(null);
     const [profileDomain, setProfileDomain] = useState<string | null>(null);
@@ -259,8 +259,6 @@ export const Teacher = ({ onSelectModule }: any) => {
     const [showNotes, setShowNotes] = useState(false);
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
     const [isListening, setIsListening] = useState(false);
-    const [showRecovery, setShowRecovery] = useState(false);
-    const [weakAreas, setWeakAreas] = useState<string[]>([]);
 
     const loadSavedNotes = async () => {
         const user = getUser();
@@ -306,7 +304,9 @@ export const Teacher = ({ onSelectModule }: any) => {
 
     const milestoneKey = milestone ? `${phaseIdx}-${milestoneIdx}` : '';
 
-    const loadExplanation = async (roadmap: Roadmap, pIdx: number, mIdx: number) => {
+    const [isSavingCache, setIsSavingCache] = useState(false);
+
+    const loadExplanation = async (roadmap: Roadmap, pIdx: number, mIdx: number, forceRegenerate: boolean = false) => {
         const ph = roadmap.phases[pIdx];
         const ms = ph?.milestones[mIdx];
         if (!ms) return;
@@ -337,7 +337,8 @@ export const Teacher = ({ onSelectModule }: any) => {
                     subtopic: ms.title,
                     domain: roadmap.title,
                     has_doubt: false,
-                    user_email: user?.email // Add user_email to the request body
+                    user_email: user?.email, // Add user_email to the request body
+                    force_regenerate: forceRegenerate
                 })
             });
             const data = await res.json();
@@ -453,6 +454,28 @@ export const Teacher = ({ onSelectModule }: any) => {
             setMilestoneIdx(0);
             setChatHistory([]); // Clear chat on topic change
             loadExplanation(selectedRoadmap, nextPIdx, 0);
+        }
+    };
+
+    const handleSaveToCache = async () => {
+        if (!explanation || !selectedRoadmap || !phase || !milestone) return;
+        setIsSavingCache(true);
+        try {
+            await fetch('http://127.0.0.1:8000/teacher/save-cache', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic: phase.name,
+                    subtopic: milestone.title,
+                    domain: selectedRoadmap.title,
+                    explanation_data: explanation
+                })
+            });
+            alert('Successfully cached! Future requests for this topic will cost 0 API quota.');
+        } catch(e) {
+            console.error('Failed to save to redis cache:', e);
+        } finally {
+            setIsSavingCache(false);
         }
     };
 
@@ -831,19 +854,6 @@ export const Teacher = ({ onSelectModule }: any) => {
                         <h2 style={{ fontSize: '1.6rem', fontWeight: 900 }}>{selectedRoadmap.title}</h2>
                     </div>
                     <p style={{ color: 'var(--text-secondary)', marginTop: '0.4rem', fontSize: '0.9rem' }}>AI-Guided Learning · Phase {phaseIdx + 1} of {selectedRoadmap.phases.length}</p>
-                    <button 
-                        className="btn btn-secondary mt-sm" 
-                        style={{ fontSize: '0.7rem', borderColor: 'var(--accent-red)', color: 'var(--accent-red)' }}
-                        onClick={async () => {
-                            const user = getUser();
-                            const res = await fetch(`http://127.0.0.1:8000/student/weak-areas?user_email=${encodeURIComponent(user.email)}`);
-                            const data = await res.json();
-                            setWeakAreas(data.weak_areas);
-                            setShowRecovery(true);
-                        }}
-                    >
-                        🩺 Enter Recovery Lounge
-                    </button>
                 </div>
                 {/* Overall Progress */}
                 <div className="glass-card" style={{ padding: '0.75rem 1.5rem', minWidth: '200px' }}>
@@ -857,42 +867,6 @@ export const Teacher = ({ onSelectModule }: any) => {
                     <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>{doneCount} / {totalMilestones} topics completed</p>
                 </div>
             </header>
-
-            {showRecovery && (
-                <div className="modal-overlay" onClick={() => setShowRecovery(false)}>
-                    <div className="glass-card fade-in" style={{ width: '500px', padding: '2rem' }} onClick={e => e.stopPropagation()}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem' }}>🩺 Personal Recovery Lounge</h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                            Based on your recent performance, we've identified these areas that need attention. Improving these will boost your overall mastery.
-                        </p>
-                        <div className="flex-wrap gap-sm" style={{ marginBottom: '2rem' }}>
-                            {weakAreas.length === 0 ? (
-                                <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>No weak areas identified yet. Great job!</p>
-                            ) : (
-                                weakAreas.map(wa => (
-                                    <span key={wa} style={{ background: 'rgba(255,100,100,0.1)', color: 'var(--accent-red)', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid rgba(255,100,100,0.2)' }}>
-                                        {wa}
-                                    </span>
-                                ))
-                            )}
-                        </div>
-                        <div className="flex-col gap-sm">
-                            <button className="btn btn-primary w-full" onClick={() => { 
-                                setShowRecovery(false); 
-                                if (onSelectModule) {
-                                    localStorage.setItem('pending_quiz_mode', 'targeted');
-                                    onSelectModule('quiz');
-                                }
-                            }}>
-                                Launch Targeted Quiz →
-                            </button>
-                            <button className="btn btn-secondary w-full" onClick={() => setShowRecovery(false)}>
-                                Back to Roadmap
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             <div style={{ 
                 display: 'grid', 
@@ -971,14 +945,32 @@ export const Teacher = ({ onSelectModule }: any) => {
                                     >
                                         {status[milestoneKey] === 'done' ? '✅ Completed' : '✓ Mark Done & Next'}
                                     </button>
-                                    <button
-                                        className="btn btn-secondary"
-                                        style={{ fontSize: '0.75rem', padding: '0.5rem 1rem', whiteSpace: 'nowrap' }}
-                                        onClick={handleDownloadNotes}
-                                        disabled={isDownloading}
-                                    >
-                                        {isDownloading ? '⏳ Generating...' : '📄 Download Notes PDF'}
-                                    </button>
+                                    <div className="flex gap-sm">
+                                        <button
+                                            className="btn btn-secondary"
+                                            style={{ fontSize: '0.75rem', padding: '0.5rem 1rem', whiteSpace: 'nowrap', flex: 1 }}
+                                            onClick={handleDownloadNotes}
+                                            disabled={isDownloading}
+                                        >
+                                            {isDownloading ? '⏳...' : '📄 PDF'}
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary"
+                                            style={{ fontSize: '0.75rem', padding: '0.5rem 1rem', whiteSpace: 'nowrap', borderColor: 'var(--accent-teal)', color: 'var(--accent-teal)' }}
+                                            onClick={() => { if(selectedRoadmap) loadExplanation(selectedRoadmap, phaseIdx, milestoneIdx, true) }}
+                                            disabled={isLoading}
+                                        >
+                                            {isLoading ? '⏳...' : '🔁 Regen'}
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary"
+                                            style={{ fontSize: '0.75rem', padding: '0.5rem 1rem', whiteSpace: 'nowrap', borderColor: 'var(--accent-orange)', color: 'var(--accent-orange)' }}
+                                            onClick={handleSaveToCache}
+                                            disabled={isSavingCache}
+                                        >
+                                            {isSavingCache ? '⏳...' : '💾 Cache'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

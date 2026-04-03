@@ -7,6 +7,7 @@ interface Analytics {
     total_interaction_hits: number;
     total_interviews: number;
     total_optimizations: number;
+    total_quizzes: number;
     avg_readiness_score: number;
     avg_optimization_score: number;
     domain_distribution: Record<string, number>;
@@ -30,6 +31,8 @@ interface StudentPerf {
     last_interview_role: string | null;
     code_optimizations_done: number;
     avg_optimization_score: number | null;
+    quizzes_completed: number;
+    avg_quiz_score: number | null;
 }
 
 export const AdminDashboard: React.FC = () => {
@@ -122,8 +125,8 @@ export const AdminDashboard: React.FC = () => {
                     { label: 'TOTAL XP EARNED', value: data?.total_xp?.toLocaleString() ?? 0, icon: '⚡', color: 'var(--accent-orange)' },
                     { label: 'TOPICS COMPLETED', value: data?.total_interaction_hits ?? 0, icon: '✅', color: 'var(--accent-green)' },
                     { label: 'INTERVIEW SESSIONS', value: data?.total_interviews ?? 0, icon: '🎤', color: 'var(--primary-500)' },
-                    { label: 'AVG READINESS SCORE', value: data?.avg_readiness_score ? `${data.avg_readiness_score}%` : '—', icon: '🎯', color: 'var(--accent-teal)' },
-                    { label: 'AVG CODE OPTIMIZATION', value: data?.avg_optimization_score ? `${data.avg_optimization_score}%` : '—', icon: '⚡', color: '#c084fc' },
+                    { label: 'CODING SESSIONS', value: data?.total_optimizations ?? 0, icon: '💻', color: '#c084fc' },
+                    { label: 'QUIZZES COMPLETED', value: data?.total_quizzes ?? 0, icon: '📝', color: 'var(--accent-orange)' },
                 ].map(stat => (
                     <div key={stat.label} className="glass-card" style={{ padding: '1.25rem' }}>
                         <div className="flex items-center gap-sm" style={{ marginBottom: '0.75rem' }}>
@@ -441,20 +444,22 @@ export const AdminDashboard: React.FC = () => {
                                             </div>
 
                                             {/* Quick Stats */}
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, auto)', gap: '1.5rem', alignItems: 'center' }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, auto)', gap: '1.5rem', alignItems: 'center' }}>
                                                 <div style={{ textAlign: 'center' }}>
                                                     <p style={{ fontWeight: 900, fontSize: '1.4rem', color: 'var(--accent-blue)', lineHeight: 1 }}>{student.topics_completed}</p>
-                                                    <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>TOPICS DONE</p>
+                                                    <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>TOPICS</p>
                                                 </div>
                                                 <div style={{ textAlign: 'center' }}>
-                                                    <p style={{ fontWeight: 900, fontSize: '1.4rem', color: 'var(--accent-orange)', lineHeight: 1 }}>{student.interview_sessions}</p>
+                                                    <p style={{ fontWeight: 900, fontSize: '1.4rem', color: 'var(--accent-orange)', lineHeight: 1 }}>{student.quizzes_completed}</p>
+                                                    <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>QUIZZES</p>
+                                                </div>
+                                                <div style={{ textAlign: 'center' }}>
+                                                    <p style={{ fontWeight: 900, fontSize: '1.4rem', color: 'var(--primary-500)', lineHeight: 1 }}>{student.interview_sessions}</p>
                                                     <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>INTERVIEWS</p>
                                                 </div>
                                                 <div style={{ textAlign: 'center' }}>
-                                                    <p style={{ fontWeight: 900, fontSize: '1.4rem', color: readinessColor(student.latest_readiness), lineHeight: 1 }}>
-                                                        {student.latest_readiness != null ? `${student.latest_readiness}%` : '—'}
-                                                    </p>
-                                                    <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>READINESS</p>
+                                                    <p style={{ fontWeight: 900, fontSize: '1.4rem', color: '#c084fc', lineHeight: 1 }}>{student.code_optimizations_done}</p>
+                                                    <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>CODING</p>
                                                 </div>
                                                 <div style={{ textAlign: 'center' }}>
                                                     <p style={{ fontWeight: 900, fontSize: '1.4rem', color: 'var(--accent-green)', lineHeight: 1 }}>{student.xp}</p>

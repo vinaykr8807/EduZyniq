@@ -497,6 +497,9 @@ Return a JSON object:
 
 def generate_topic_notes_pdf(topic: str, subtopic: str, domain: str) -> io.BytesIO:
     """Generate professional PDF notes for a subtopic using Groq content + ReportLab, enhanced by RAG."""
+    import html
+    import requests
+    from io import BytesIO
     from services.rag_service import generate_rag_context
     rag_context = generate_rag_context(topic, subtopic, domain)
     context_injection = ""
@@ -587,8 +590,6 @@ CRITICAL:
 
     def add_text_with_math(text, style, indent=0):
         if not text: return
-        import requests
-        from io import BytesIO
         
         # 1. Clean markdown crud
         text = _strip_md(text)
@@ -626,18 +627,11 @@ CRITICAL:
                     if part.startswith('$') and part.endswith('$'):
                         # Render Inline Math (Attempt simple version or just italics if complex)
                         math = part[1:-1].strip()
-                        # For PDF simplicity, if inline is complex, we render as image or just bold/italic
-                        # But CodeCogs supports \inline
-                        try:
-                            math_url = f"https://latex.codecogs.com/png.latex?%5Cinline%20%5Ccolor%7B%231a2e1f%7D%20{requests.utils.quote(math)}"
-                            # We'll use Paragraph to keep it in flow if possible, 
-                            # but ReportLab Paragraph <img> is tricky for dynamic sizes.
-                            # So we'll just bold it for now or use a basic italic style
-                            p_text += f"<i><b>{math}</b></i> "
-                        except:
-                            p_text += f"<i>{math}</i>"
+                        escaped_math = html.escape(math)
+                        # For PDF simplicity, if inline is complex, we render as italic
+                        p_text += f"<i>{escaped_math}</i> "
                     else:
-                        p_text += part
+                        p_text += html.escape(part)
                 if p_text.strip():
                     story.append(Paragraph(p_text, style))
 
@@ -692,8 +686,6 @@ CRITICAL:
         print(f"  → Generating PDF D2 Source (Fixed):\n{d2_code}")
         
         try:
-            import requests
-            from io import BytesIO
             story.append(Paragraph("📊 Architecture Flowchart", section_style))
             res = requests.post("https://kroki.io/d2/png", data=d2_code.encode(), timeout=5)
             if res.ok:

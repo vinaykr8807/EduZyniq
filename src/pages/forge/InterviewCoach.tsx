@@ -20,16 +20,17 @@ interface AnalysisResult {
     };
     ats_score?: {
         total_score: number;
-        breakdown: {
+        breakdown?: {
             parseability: number;
             keyword_match: number;
             impact_metrics: number;
             formatting: number;
             section_completeness: number;
         };
-        critical_keywords_found: string[];
-        missing_critical_keywords: string[];
-        improvement_suggestions: string[];
+        critical_keywords_found?: string[];
+        missing_critical_keywords?: string[];
+        improvement_suggestions?: string[];
+        suggestions?: string[];
     };
 }
 
@@ -119,6 +120,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const [runningTests, setRunningTests] = useState(false);
     const [testResults, setTestResults] = useState<any>(null);
     const [codingEval, setCodingEval] = useState<any>(null);
+    const [confirmSkip, setConfirmSkip] = useState(false);
 
     // Initialize Speech Recognition
     useEffect(() => {
@@ -182,7 +184,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setActiveTab('mock');
         setMockIndex(0); setMockQuestions([]); setMockEvals([]); setMockComplete(false);
         setCurrentQuestion(null); setUserMockAnswer(''); setUserApproach(''); setUserCode('');
-        setCodingPhase('approach'); setTestResults(null); setCodingEval(null);
+        setCodingPhase('approach'); setTestResults(null); setCodingEval(null); setConfirmSkip(false);
         try {
             const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
             const res = await fetch('http://127.0.0.1:8000/coach/mock-interview/plan', {
@@ -314,17 +316,29 @@ export const InterviewCoach = ({ onComplete }: any) => {
     };
 
     const skipQuestion = () => {
+        // For coding questions, show confirmation banner first instead of auto-advancing
+        if (currentQuestion?.category === 'coding') {
+            setConfirmSkip(true);
+            return;
+        }
+        doSkip();
+    };
+
+    const doSkip = () => {
         const nextIdx = mockIndex + 1;
         const skippedEval = {
             question: currentQuestion.question,
             overall_score: 0,
             strengths: "N/A",
-            weaknesses: "Question was skipped by candidate.",
+            weaknesses: "Question was skipped. Direct evaluation of this specific topic was not possible during this round.",
+            mentor_feedback: "You chose to skip this round. While skipping is an option, we encourage attempting every question—even briefly—to help the AI coach pinpoint your hidden strengths and growth areas.",
             improved_answer: "N/A",
+            weak_areas: ["Round Skipped"],
             type: currentQuestion.category === 'coding' ? 'coding' : 'standard'
         };
         const newEvals = [...mockEvals, skippedEval];
         setMockEvals(newEvals);
+        setConfirmSkip(false);
 
         if (nextIdx < (mockPlan?.length || 0)) {
             setMockIndex(nextIdx);
@@ -699,58 +713,70 @@ export const InterviewCoach = ({ onComplete }: any) => {
                         )}
 
                         {/* ATS Audit Section */}
-                        {activeTab === 'ats' && result?.ats_score && (
+                        {activeTab === 'ats' && (
                             <div className="flex-col gap-lg fade-in">
-                                <div className="glass-card" style={{ padding: '2rem', border: '1px solid var(--primary-500)', background: 'linear-gradient(135deg, rgba(139,92,246,0.05) 0%, transparent 100%)' }}>
-                                    <div className="flex justify-between items-center flex-wrap gap-xl">
-                                        <div style={{ textAlign: 'center' }}>
-                                            <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary-400)', letterSpacing: '2px', marginBottom: '8px' }}>ATS OPTIMIZATION SCORE</p>
-                                            <h3 style={{ fontSize: '4rem', fontWeight: 900, color: result.ats_score.total_score >= 80 ? 'var(--accent-green)' : result.ats_score.total_score >= 50 ? 'var(--accent-orange)' : 'var(--accent-red)' }}>
-                                                {result.ats_score.total_score}%
-                                            </h3>
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: '300px' }} className="flex-col gap-md">
-                                            {Object.entries(result.ats_score.breakdown).map(([key, val]) => (
-                                                <div key={key} className="flex-col gap-xs">
-                                                    <div className="flex justify-between" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                                                        <span style={{ textTransform: 'capitalize' }}>{key.replace('_', ' ')}</span>
-                                                        <span>{val}%</span>
-                                                    </div>
-                                                    <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                                                        <div style={{ height: '100%', width: `${val}%`, background: 'var(--primary-500)', borderRadius: '3px' }} />
-                                                    </div>
+                                {result?.ats_score ? (
+                                    <>
+                                        <div className="glass-card" style={{ padding: '2rem', border: '1px solid var(--primary-500)', background: 'linear-gradient(135deg, rgba(139,92,246,0.05) 0%, transparent 100%)' }}>
+                                            <div className="flex justify-between items-center flex-wrap gap-xl">
+                                                <div style={{ textAlign: 'center' }}>
+                                                    <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary-400)', letterSpacing: '2px', marginBottom: '8px' }}>ATS OPTIMIZATION SCORE</p>
+                                                    <h3 style={{ fontSize: '4rem', fontWeight: 900, color: result.ats_score.total_score >= 80 ? 'var(--accent-green)' : result.ats_score.total_score >= 50 ? 'var(--accent-orange)' : 'var(--accent-red)' }}>
+                                                        {result.ats_score.total_score}%
+                                                    </h3>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid-2 gap-lg">
-                                    <div className="glass-card" style={{ padding: '1.5rem' }}>
-                                        <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--accent-blue)', marginBottom: '1.25rem', textTransform: 'uppercase' }}>✅ Critical Keywords Found</h4>
-                                        <div className="flex flex-wrap gap-xs">
-                                            {result.ats_score.critical_keywords_found.map(k => <span key={k} className="badge" style={{ fontSize: '0.72rem', borderColor: 'rgba(56,183,248,0.2)' }}>{k}</span>)}
-                                        </div>
-                                    </div>
-                                    <div className="glass-card" style={{ padding: '1.5rem' }}>
-                                        <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--accent-red)', marginBottom: '1.25rem', textTransform: 'uppercase' }}>❌ Missing Domain Keywords</h4>
-                                        <div className="flex flex-wrap gap-xs">
-                                            {result.ats_score.missing_critical_keywords.map(k => <span key={k} className="badge" style={{ fontSize: '0.72rem', borderColor: 'rgba(239,68,68,0.2)', color: 'var(--accent-red)' }}>{k}</span>)}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="glass-card" style={{ padding: '1.5rem', borderLeft: '6px solid var(--accent-orange)' }}>
-                                    <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: 'white', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 'sm' }}>🛠️ Strategic Improvement Suggestions</h4>
-                                    <div className="flex-col gap-sm">
-                                        {result.ats_score.improvement_suggestions.map((s, i) => (
-                                            <div key={i} className="flex items-start gap-sm" style={{ padding: '0.8rem', background: 'rgba(245,158,11,0.03)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.1)' }}>
-                                                <span style={{ color: 'var(--accent-orange)', fontWeight: 900 }}>{i + 1}.</span>
-                                                <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{s}</p>
+                                                <div style={{ flex: 1, minWidth: '300px' }} className="flex-col gap-md">
+                                                    {result.ats_score.breakdown && Object.entries(result.ats_score.breakdown).map(([key, val]) => (
+                                                        <div key={key} className="flex-col gap-xs">
+                                                            <div className="flex justify-between" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                                                                <span style={{ textTransform: 'capitalize' }}>{key.replace('_', ' ')}</span>
+                                                                <span>{val as number}%</span>
+                                                            </div>
+                                                            <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                                                                <div style={{ height: '100%', width: `${val}%`, background: 'var(--primary-500)', borderRadius: '3px' }} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        ))}
+                                        </div>
+
+                                        <div className="grid-2 gap-lg">
+                                            <div className="glass-card" style={{ padding: '1.5rem' }}>
+                                                <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--accent-blue)', marginBottom: '1.25rem', textTransform: 'uppercase' }}>✅ Critical Keywords Found</h4>
+                                                <div className="flex flex-wrap gap-xs">
+                                                    {(result.ats_score.critical_keywords_found || []).map(k => <span key={k} className="badge" style={{ fontSize: '0.72rem', borderColor: 'rgba(56,183,248,0.2)' }}>{k}</span>)}
+                                                </div>
+                                            </div>
+                                            <div className="glass-card" style={{ padding: '1.5rem' }}>
+                                                <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--accent-red)', marginBottom: '1.25rem', textTransform: 'uppercase' }}>❌ Missing Domain Keywords</h4>
+                                                <div className="flex flex-wrap gap-xs">
+                                                    {(result.ats_score.missing_critical_keywords || []).map(k => <span key={k} className="badge" style={{ fontSize: '0.72rem', borderColor: 'rgba(239,68,68,0.2)', color: 'var(--accent-red)' }}>{k}</span>)}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="glass-card" style={{ padding: '1.5rem', borderLeft: '6px solid var(--accent-orange)' }}>
+                                            <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: 'white', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 'sm' }}>🛠️ Strategic Improvement Suggestions</h4>
+                                            <div className="flex-col gap-sm">
+                                                {(result.ats_score.improvement_suggestions || result.ats_score.suggestions || []).map((s, i) => (
+                                                    <div key={i} className="flex items-start gap-sm" style={{ padding: '0.8rem', background: 'rgba(245,158,11,0.03)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.1)' }}>
+                                                        <span style={{ color: 'var(--accent-orange)', fontWeight: 900 }}>{i + 1}.</span>
+                                                        <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{s}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="glass-card flex-col items-center justify-center p-xl gap-md" style={{ minHeight: '300px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                        <span style={{ fontSize: '3rem' }}>⚠️</span>
+                                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>ATS Audit Unavailable</h3>
+                                        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '400px' }}>
+                                            We couldn't generate the ATS compatibility report. This usually happens if the AI service failed or the resume couldn't be parsed properly. Please upload a clearer PDF or DOCX file.
+                                        </p>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         )}
 
@@ -980,6 +1006,23 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                         ))}
                                                     </div>
 
+                                                    {/* Skip Confirmation Banner (Visible in any phase) */}
+                                                    {confirmSkip && (
+                                                        <div style={{ marginTop: '0.5rem', padding: '1rem 1.25rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                                                            <span style={{ fontSize: '0.88rem', color: 'var(--accent-red)', fontWeight: 700, flex: 1 }}>
+                                                                ⚠️ Are you sure you want to skip this coding challenge? It will be marked as skipped in your feedback.
+                                                            </span>
+                                                            <div className="flex gap-sm">
+                                                                <button className="btn btn-secondary" onClick={() => setConfirmSkip(false)} style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }}>
+                                                                    ✏️ Keep Trying
+                                                                </button>
+                                                                <button className="btn" onClick={doSkip} style={{ fontSize: '0.78rem', padding: '0.4rem 1rem', background: 'rgba(239,68,68,0.2)', color: 'var(--accent-red)', border: '1px solid rgba(239,68,68,0.4)' }}>
+                                                                    ⏩ Yes, Skip
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
                                                     {/* PHASE 1: Approach */}
                                                     {codingPhase === 'approach' && (
                                                         <div className="flex-col gap-md">
@@ -1061,12 +1104,14 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                                     style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #059669, #10b981)' }}>
                                                                     {isMockLoading ? '⏳ Evaluating...' : '✅ Submit for AI Feedback'}
                                                                 </button>
-                                                                <button className="btn btn-secondary" onClick={skipQuestion} style={{ opacity: 0.6, fontSize: '0.8rem' }}>
+                                                                <button className="btn btn-secondary" onClick={skipQuestion} disabled={isMockLoading} style={{ opacity: 0.7, fontSize: '0.8rem' }}>
                                                                     ⏩ Skip Round
                                                                 </button>
                                                             </div>
+                                                            <div style={{ marginTop: '2rem' }}></div>
                                                         </div>
                                                     )}
+
 
                                                     {/* PHASE 3: Results */}
                                                     {codingPhase === 'results' && codingEval && (
@@ -1127,7 +1172,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                             </div>
 
                                                             {mockIndex + 1 < (mockPlan?.length || 0) && (
-                                                                <button className="btn btn-primary" onClick={advanceFromCodingRound} style={{ alignSelf: 'flex-start', padding: '0.8rem 2rem' }}>
+                                                                <button className="btn btn-primary" onClick={advanceFromCodingRound} style={{ alignSelf: 'flex-start', padding: '0.8rem 2rem', marginTop: '1rem' }}>
                                                                     Next Question →
                                                                 </button>
                                                             )}
@@ -1179,13 +1224,13 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                             placeholder="Type your answer here or click 'Speak Answer'... (Tip: Use the STAR method)" />
                                                     </div>
 
-                                                    <div className="flex gap-md">
+                                                    <div className="flex gap-md" style={{ marginTop: '1.5rem', gap: '1rem' }}>
                                                         <button className="btn btn-primary" onClick={submitMockAnswer}
                                                             disabled={isMockLoading || userMockAnswer.trim().length === 0}
-                                                            style={{ alignSelf: 'flex-start', padding: '0.8rem 2rem' }}>
+                                                            style={{ padding: '0.8rem 2rem' }}>
                                                             {isMockLoading ? '⏳ Evaluating...' : 'Submit Answer →'}
                                                         </button>
-                                                        <button className="btn btn-secondary" onClick={skipQuestion} style={{ opacity: 0.6 }}>
+                                                        <button className="btn btn-secondary" onClick={skipQuestion} disabled={isMockLoading} style={{ opacity: 0.6, padding: '0.8rem 2rem' }}>
                                                             ⏩ Skip Question
                                                         </button>
                                                     </div>
@@ -1204,7 +1249,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                             <span style={{ fontSize: '4rem' }}>⭐</span>
                                             <h2 style={{ fontSize: '2rem', fontWeight: 900, marginTop: '1rem' }}>Interview Complete!</h2>
                                             <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>You've completed all {mockPlan.length} rounds of the AI Simulator.</p>
-                                            
+
                                             <div className="flex justify-center gap-xl">
                                                 <div>
                                                     <p style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '1px' }}>OVERALL PERFORMANCE</p>
@@ -1213,7 +1258,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                     </h3>
                                                 </div>
                                             </div>
-                                            
+
                                             <button className="btn btn-primary mt-xl" onClick={() => { setMockComplete(false); setMockEvals([]); setMockIndex(0); startMockInterview(); }}>
                                                 Restart Simulator
                                             </button>
@@ -1225,33 +1270,33 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                 const isSkipped = ev.overall_score === 0 && ev.weaknesses?.toLowerCase().includes('skipped');
                                                 const borderColor = isSkipped ? 'rgba(148,163,184,0.5)' : ev.overall_score >= 7 ? 'var(--accent-green)' : ev.overall_score >= 4 ? 'var(--accent-orange)' : 'var(--accent-red)';
                                                 return (
-                                                <div key={i} className="glass-card" style={{ padding: '1.5rem', borderLeft: `6px solid ${borderColor}` }}>
-                                                    <div className="flex justify-between items-start" style={{ marginBottom: '0.75rem' }}>
-                                                        <div className="flex-col gap-xs">
-                                                            <div className="flex items-center gap-sm">
-                                                                <span style={{ fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-muted)' }}>ROUND {i + 1}: {ev.type?.toUpperCase()}</span>
-                                                                {isSkipped && <span style={{ fontSize: '0.65rem', background: 'rgba(148,163,184,0.15)', color: '#94a3b8', padding: '2px 8px', borderRadius: '999px', border: '1px solid rgba(148,163,184,0.3)', fontWeight: 700 }}>⏩ SKIPPED</span>}
+                                                    <div key={i} className="glass-card fade-in" style={{ padding: '2rem', borderLeft: `8px solid ${borderColor}`, marginBottom: '1.5rem' }}>
+                                                        <div className="flex justify-between items-start" style={{ marginBottom: '0.75rem' }}>
+                                                            <div className="flex-col gap-xs">
+                                                                <div className="flex items-center gap-sm">
+                                                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-muted)' }}>ROUND {i + 1}: {ev.type?.toUpperCase()}</span>
+                                                                    {isSkipped && <span style={{ fontSize: '0.65rem', background: 'rgba(148,163,184,0.15)', color: '#94a3b8', padding: '2px 8px', borderRadius: '999px', border: '1px solid rgba(148,163,184,0.3)', fontWeight: 700 }}>⏩ SKIPPED</span>}
+                                                                </div>
+                                                                <h5 style={{ fontSize: '1rem', fontWeight: 700 }}>{ev.question.slice(0, 100)}...</h5>
                                                             </div>
-                                                            <h5 style={{ fontSize: '1rem', fontWeight: 700 }}>{ev.question.slice(0, 100)}...</h5>
+                                                            {!isSkipped && <span style={{ fontSize: '1.5rem', fontWeight: 900, color: ev.overall_score >= 7 ? 'var(--accent-green)' : ev.overall_score >= 4 ? 'var(--accent-orange)' : 'var(--accent-red)' }}>{ev.overall_score}/10</span>}
                                                         </div>
-                                                        {!isSkipped && <span style={{ fontSize: '1.5rem', fontWeight: 900, color: ev.overall_score >= 7 ? 'var(--accent-green)' : ev.overall_score >= 4 ? 'var(--accent-orange)' : 'var(--accent-red)' }}>{ev.overall_score}/10</span>}
+                                                        {isSkipped ? (
+                                                            <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>This question was skipped. For best results, attempt every question — even a partial answer helps the AI evaluate your thinking process.</p>
+                                                        ) : (
+                                                            <div className="flex-col gap-sm" style={{ fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                                                {ev.mentor_feedback && <p>{ev.mentor_feedback}</p>}
+                                                                {ev.advice && <p><strong>Coach Advice:</strong> {ev.advice}</p>}
+                                                                {ev.optimal_solution && <p><strong>Optimal Approach:</strong> {ev.optimal_solution}</p>}
+                                                                {ev.strengths && ev.strengths !== 'N/A' && <p style={{ color: 'var(--accent-green)' }}><strong>✅ Strength:</strong> {ev.strengths}</p>}
+                                                                {ev.weaknesses && ev.weaknesses !== 'N/A' && <p style={{ color: 'var(--text-secondary)' }}><strong>⚠️ To Improve:</strong> {ev.weaknesses}</p>}
+                                                                {ev.improved_answer && ev.improved_answer !== 'N/A' && <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', borderLeft: '3px solid var(--primary-500)', marginTop: '0.5rem' }}>
+                                                                    <strong style={{ fontSize: '0.75rem', color: 'var(--primary-400)' }}>EXPERT SAMPLE ANSWER:</strong>
+                                                                    <p style={{ marginTop: '0.3rem' }}>{ev.improved_answer}</p>
+                                                                </div>}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    {isSkipped ? (
-                                                        <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>This question was skipped. For best results, attempt every question — even a partial answer helps the AI evaluate your thinking process.</p>
-                                                    ) : (
-                                                        <div className="flex-col gap-sm" style={{ fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                                                            {ev.mentor_feedback && <p>{ev.mentor_feedback}</p>}
-                                                            {ev.advice && <p><strong>Coach Advice:</strong> {ev.advice}</p>}
-                                                            {ev.optimal_solution && <p><strong>Optimal Approach:</strong> {ev.optimal_solution}</p>}
-                                                            {ev.strengths && ev.strengths !== 'N/A' && <p style={{ color: 'var(--accent-green)' }}><strong>✅ Strength:</strong> {ev.strengths}</p>}
-                                                            {ev.weaknesses && ev.weaknesses !== 'N/A' && <p style={{ color: 'var(--text-secondary)' }}><strong>⚠️ To Improve:</strong> {ev.weaknesses}</p>}
-                                                            {ev.improved_answer && ev.improved_answer !== 'N/A' && <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', borderLeft: '3px solid var(--primary-500)', marginTop: '0.5rem' }}>
-                                                                <strong style={{ fontSize: '0.75rem', color: 'var(--primary-400)' }}>EXPERT SAMPLE ANSWER:</strong>
-                                                                <p style={{ marginTop: '0.3rem' }}>{ev.improved_answer}</p>
-                                                            </div>}
-                                                        </div>
-                                                    )}
-                                                </div>
                                                 );
                                             })}
                                         </div>

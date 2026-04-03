@@ -155,7 +155,7 @@ export const CareerPathfinder = () => {
                 <p style={{ color: 'var(--text-secondary)' }}>Resume-driven roadmap, market demand, and city-specific role guidance</p>
             </header>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) minmax(0, 1fr)', gap: '1.5rem' }} className="career-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) minmax(0, 1fr)', gap: '2.5rem' }} className="career-grid">
                 <div className="glass-card flex-col gap-lg" style={{ padding: '1.5rem', height: 'fit-content' }}>
                     <h3 style={{ fontSize: '1rem', color: 'var(--primary-400)' }}>Career Inputs</h3>
 

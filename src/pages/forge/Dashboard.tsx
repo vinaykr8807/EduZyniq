@@ -212,9 +212,19 @@ export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any
                     }}>
                         <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem' }}>Rewards</h4>
                         <div className="flex-col gap-md">
-                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>No badges yet</p>
+                            {progress?.badges && progress.badges.length > 0 ? (
+                                <div className="flex gap-sm" style={{ flexWrap: 'wrap' }}>
+                                    {progress.badges.map((badge: string, i: number) => (
+                                        <span key={i} style={{ padding: '0.3rem 0.6rem', background: 'var(--bg-tertiary)', border: '1px solid var(--primary-400)', borderRadius: '100px', fontSize: '0.72rem', color: 'var(--primary-400)', fontWeight: 800 }}>
+                                            🏅 {badge}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>No badges yet</p>
+                            )}
                             <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--primary-400)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                ⚡ 0 day streak
+                                ⚡ {progress?.streak_days || 0} day streak
                             </span>
                         </div>
                     </div>
