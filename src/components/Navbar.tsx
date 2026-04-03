@@ -62,7 +62,7 @@ export const Navbar: React.FC = () => {
                 </Link>
 
                 {/* Centered Links */}
-                <div className="flex items-center mobile-hide" style={{ gap: '2rem', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+                <div className="flex items-center" style={{ gap: '2rem', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
                     {navLinks.map((link) => (
                         <Link
                             key={link.path}
