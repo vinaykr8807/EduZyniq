@@ -558,14 +558,61 @@ def _extract_deep_resume_insights(text: str, role: str) -> List[str]:
         return _extract_skills_from_text(text)
 
 
+def _extract_resume_projects(text: str) -> List[Dict]:
+    """Uses LLM to extract actual projects listed in the resume's PROJECTS section."""
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key or not text:
+        return []
+
+    client = Groq(api_key=groq_key)
+    prompt = f"""
+Extract ALL projects listed in the PROJECTS section of this resume.
+For each project, return: name, technologies used (tech), and a brief 1-sentence description.
+
+Resume Text:
+\"\"\"{text[:5000]}\"\"\"
+
+Return ONLY valid JSON:
+{{
+  "projects": [
+    {{"name": "Project Name", "tech": "Python, React, FastAPI", "description": "What it does in one sentence."}},
+    ...
+  ]
+}}
+"""
+    try:
+        res = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            response_format={"type": "json_object"}
+        )
+        data = json.loads(res.choices[0].message.content)
+        raw = data.get("projects", [])
+        # Normalize
+        out = []
+        for p in raw:
+            if isinstance(p, dict):
+                out.append({
+                    "name": str(p.get("name", "")).strip(),
+                    "tech": str(p.get("tech", "")).strip(),
+                    "description": str(p.get("description", "")).strip(),
+                })
+        return out
+    except Exception as e:
+        print(f"Project extraction failed: {e}")
+        return []
+
+
 def generate_career_report(resume_text: str, role: str, level: str, city: str, user_email: Optional[str] = None) -> Dict:
     from services.historical_market_data import historical_service, risk_service
     from main import supabase 
     
     normalized_role = role if role in ROLE_SKILLS else "Fullstack Developer"
-    # 1. Deep LLM-based Resume Analysis instead of simple keyword mapping
+    # 1. Deep LLM-based Resume Analysis + Project Extraction
     print(f"🚀 Performing deep resume analysis for {normalized_role}...")
     resume_skills_found = _extract_deep_resume_insights(resume_text, normalized_role)
+    resume_projects = _extract_resume_projects(resume_text)
+    print(f"📁 Extracted {len(resume_projects)} projects from resume.")
     
     # 2. Fetch performance stats for capability score
     quiz_score: float = 0.0
@@ -637,6 +684,7 @@ def generate_career_report(resume_text: str, role: str, level: str, city: str, u
         "readiness_score": final_readiness,
         "capability_analysis": capability_metadata,
         "resume_skills": resume_skills_found,
+        "resume_projects": resume_projects,
         "market_required_skills": market_required_skills,
         "matched_skills": matched_skills_list,
         "missing_skills": missing_skills_list,

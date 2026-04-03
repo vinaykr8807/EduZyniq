@@ -10,12 +10,19 @@ interface JobMarketItem {
     origin?: string;
 }
 
+interface ResumeProject {
+    name: string;
+    tech: string;
+    description: string;
+}
+
 interface CareerReport {
     role: string;
     level: string;
     city: string;
     readiness_score: number;
     resume_skills: string[];
+    resume_projects?: ResumeProject[];
     market_required_skills: string[];
     matched_skills: string[];
     missing_skills: string[];
@@ -292,6 +299,21 @@ export const CareerPathfinder = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {report.resume_projects && report.resume_projects.length > 0 && (
+                                <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid rgba(100,130,255,0.15)' }}>
+                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>🗂️ Your Resume Projects</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.85rem' }}>
+                                        {report.resume_projects.map((proj, i) => (
+                                            <div key={i} style={{ padding: '1rem 1.25rem', background: 'rgba(100,130,255,0.04)', border: '1px solid rgba(100,130,255,0.15)', borderRadius: '10px', borderTop: '3px solid var(--primary-500)' }}>
+                                                <p style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>{proj.name}</p>
+                                                {proj.tech && <p style={{ fontSize: '0.72rem', color: 'var(--primary-400)', fontWeight: 700, marginBottom: '0.4rem' }}>🛠 {proj.tech}</p>}
+                                                {proj.description && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{proj.description}</p>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="glass-card" style={{ padding: '1.5rem' }}>
                                 <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Guide To Proceed</h3>
