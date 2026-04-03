@@ -6,6 +6,7 @@ import { Assistant } from './pages/Assistant';
 import { LoginPage } from './pages/LoginPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { CurriculumPage } from './pages/CurriculumPage';
+import { useTheme } from './hooks/useTheme';
 
 // Simple Route Guard
 const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: string }) => {
@@ -26,6 +27,8 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: 
 };
 
 function App() {
+  // Initialize theme from localStorage on every mount — applies data-theme to <html>
+  useTheme();
   return (
     <Router>
       <Routes>
