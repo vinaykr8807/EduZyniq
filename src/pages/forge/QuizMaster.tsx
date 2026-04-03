@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import API_BASE_URL from '../../config';
 import { CURRICULUM_DATA, type Roadmap } from '../../data/curriculumData';
 import { KnowledgeGraph } from '../../components/KnowledgeGraph';
 interface Question {
@@ -59,7 +60,7 @@ export const QuizMaster = ({ onComplete }: any) => {
         const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
         if (!user.email) return;
 
-        fetch(`http://127.0.0.1:8000/student/profile?user_email=${encodeURIComponent(user.email)}`)
+        fetch(`${API_BASE_URL}/student/profile?user_email=${encodeURIComponent(user.email)}`)
             .then(r => r.json())
             .then(data => {
                 if (data.profile?.domain) {
@@ -101,10 +102,10 @@ export const QuizMaster = ({ onComplete }: any) => {
 
             if (quizMode === 'targeted') {
                 // Fetch weak areas first if needed, or assume they are passed/calculated
-                const weakRes = await fetch(`http://127.0.0.1:8000/student/weak-areas?user_email=${encodeURIComponent(user.email)}`);
+                const weakRes = await fetch(`${API_BASE_URL}/student/weak-areas?user_email=${encodeURIComponent(user.email)}`);
                 const weakData = await weakRes.json();
                 
-                const res = await fetch(`http://127.0.0.1:8000/student/targeted-quiz`, {
+                const res = await fetch(`${API_BASE_URL}/student/targeted-quiz`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -126,7 +127,7 @@ export const QuizMaster = ({ onComplete }: any) => {
                     ...(subtopic && { subtopic })
                 });
 
-                const res = await fetch(`http://127.0.0.1:8000/generate-quiz?${queryParams.toString()}`);
+                const res = await fetch(`${API_BASE_URL}/generate-quiz?${queryParams.toString()}`);
                 data = await res.json();
             }
 
@@ -155,7 +156,7 @@ export const QuizMaster = ({ onComplete }: any) => {
         setIsAnalyzing(true);
         try {
             const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
-            const res = await fetch('http://127.0.0.1:8000/evaluate-explanation', {
+            const res = await fetch(`${API_BASE_URL}/evaluate-explanation`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -261,7 +262,7 @@ export const QuizMaster = ({ onComplete }: any) => {
             const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
             try {
                 if (user.email) {
-                    await fetch('http://127.0.0.1:8000/submit-quiz', {
+                    await fetch(`${API_BASE_URL}/submit-quiz`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -277,7 +278,7 @@ export const QuizMaster = ({ onComplete }: any) => {
                     });
                 }
 
-                const fbRes = await fetch('http://127.0.0.1:8000/quiz-feedback', {
+                const fbRes = await fetch(`${API_BASE_URL}/quiz-feedback`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
