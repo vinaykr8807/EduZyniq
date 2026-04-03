@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Mode, ChatMessage, StudentProfile, User } from '../types';
+import API_BASE_URL from '../config';
 
 export const useEdunovas = () => {
     const [activeMode, setActiveMode] = useState<Mode>('ROUTER');
@@ -51,7 +52,7 @@ export const useEdunovas = () => {
         const user = getLocalUser();
         if (!user) return;
         try {
-            const res = await fetch(`http://127.0.0.1:8000/student/progress?user_email=${user.email}`);
+            const res = await fetch(`${API_BASE_URL}/student/progress?user_email=${user.email}`);
             const data = await res.json();
             setProgress(data);
         } catch (e) {
@@ -63,7 +64,7 @@ export const useEdunovas = () => {
         const user = getLocalUser();
         if (!user) return;
         try {
-            const res = await fetch(`http://127.0.0.1:8000/performance-stats?user_email=${user.email}`);
+            const res = await fetch(`${API_BASE_URL}/performance-stats?user_email=${user.email}`);
             const data = await res.json();
             setStats(data);
         } catch (e) {
@@ -84,7 +85,7 @@ export const useEdunovas = () => {
         if (!user) return;
 
         try {
-            await fetch('http://127.0.0.1:8000/save-profile?user_email=' + user.email, {
+            await fetch(`${API_BASE_URL}/save-profile?user_email=` + user.email, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(p)
@@ -110,7 +111,7 @@ export const useEdunovas = () => {
         setIsTyping(true);
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/chat', {
+            const response = await fetch(`${API_BASE_URL}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import API_BASE_URL from '../../config';
 import { CURRICULUM_DATA, type Roadmap } from '../../data/curriculumData';
 import { playNotificationSound } from '../../utils/audio';
 import { InlineMath, BlockMath } from 'react-katex';
@@ -147,7 +148,7 @@ const saveProgress = async (payload: object) => {
     try {
         const user = getUser();
         if (!user?.email) return;
-        await fetch('http://127.0.0.1:8000/save-teacher-progress', {
+        await fetch(`${API_BASE_URL}/save-teacher-progress`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_email: user.email, ...payload })
@@ -329,7 +330,7 @@ export const Teacher = () => {
         });
         try {
             const user = getUser(); // Get user here
-            const res = await fetch('http://127.0.0.1:8000/teacher/explain', {
+            const res = await fetch(`${API_BASE_URL}/teacher/explain`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -382,12 +383,12 @@ export const Teacher = () => {
                 formData.append('message', currentText);
                 formData.append('file', currentFile);
 
-                res = await fetch('http://127.0.0.1:8000/teacher/ask-multimodal', {
+                res = await fetch(`${API_BASE_URL}/teacher/ask-multimodal`, {
                     method: 'POST',
                     body: formData
                 });
             } else {
-                res = await fetch('http://127.0.0.1:8000/teacher/explain', {
+                res = await fetch(`${API_BASE_URL}/teacher/explain`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -461,7 +462,7 @@ export const Teacher = () => {
         if (!explanation || !selectedRoadmap || !phase || !milestone) return;
         setIsSavingCache(true);
         try {
-            await fetch('http://127.0.0.1:8000/teacher/save-cache', {
+            await fetch(`${API_BASE_URL}/teacher/save-cache`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -484,7 +485,7 @@ export const Teacher = () => {
         setIsDownloading(true);
         try {
             const user = getUser();
-            const res = await fetch('http://127.0.0.1:8000/teacher/generate-notes', {
+            const res = await fetch(`${API_BASE_URL}/teacher/generate-notes`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
