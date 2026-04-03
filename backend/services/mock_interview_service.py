@@ -143,7 +143,12 @@ def build_mock_plan(role: str, domain: str, extracted_skills: list, user_email: 
     if resume_context:
         try:
             rc = json.loads(resume_context)
-            project_names = rc.get("projects", []) or rc.get("strong_domains", [])
+            raw_projects = rc.get("resume_projects") or []
+            for p in raw_projects:
+                if isinstance(p, dict) and p.get("name"):
+                    project_names.append(p["name"])
+                elif isinstance(p, str):
+                    project_names.append(p)
         except Exception:
             pass
 
@@ -212,10 +217,27 @@ def generate_mock_question(
                           (context["session"].get("extracted_skills", []) if context else []))
     missing_list = (resume_data.get("missing_skills") or
                     (context["session"].get("missing_skills", []) if context else []))
-    projects_raw = resume_data.get("projects") or resume_data.get("strong_domains") or []
+
+    # Extract structured resume projects (new field: name, tech, description)
+    resume_projects_raw = resume_data.get("resume_projects") or []
+    projects_str = "not specified"
+    project_names = []
+    if resume_projects_raw:
+        parts = []
+        for p in resume_projects_raw:
+            if isinstance(p, dict):
+                name = p.get("name", "")
+                tech = p.get("tech", "")
+                desc = p.get("description", "")
+                project_names.append(name)
+                parts.append(f"  - {name} (Tech: {tech}): {desc}")
+            elif isinstance(p, str):
+                project_names.append(p)
+                parts.append(f"  - {p}")
+        projects_str = "\n".join(parts)
+
     resume_skills = ", ".join(resume_skills_list)
     missing = ", ".join(missing_list)
-    projects_str = ", ".join([str(p) for p in projects_raw]) if projects_raw else "not specified"
     ats_score = (resume_data.get("ats_score", {}).get("total_score") or
                  (context["session"].get("ats_score", {}).get("total_score", "N/A") if context else "N/A"))
     past_weak = _past_weak_areas(context)

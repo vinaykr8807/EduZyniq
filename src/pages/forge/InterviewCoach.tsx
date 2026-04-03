@@ -1,10 +1,17 @@
 import { useEffect, useState, useRef } from 'react';
 
+interface ResumeProject {
+    name: string;
+    tech: string;
+    description: string;
+}
+
 interface AnalysisResult {
     extracted_skills: string[];
     strong_domains: string[];
     missing_skills: string[];
     readiness_score: number;
+    resume_projects?: ResumeProject[];
     roadmap: {
         beginner: string[];
         intermediate: string[];

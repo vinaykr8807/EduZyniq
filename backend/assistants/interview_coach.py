@@ -199,12 +199,23 @@ def _normalize_analysis(raw_analysis: dict, text: str, role: str):
     merged_missing = sorted(set(missing + find_skill_gaps(merged_extracted, role)))
     merged_strong = sorted(set((strong or fallback["strong_domains"]) + [detect_primary_domain(merged_extracted)]))
 
+    raw_resume_projects = analysis.get("resume_projects", [])
+    # Normalize resume_projects to list of dicts or strings
+    resume_projects = []
+    if isinstance(raw_resume_projects, list):
+        for p in raw_resume_projects:
+            if isinstance(p, dict):
+                resume_projects.append(p)
+            elif isinstance(p, str) and p.strip():
+                resume_projects.append({"name": p.strip(), "tech": "", "description": ""})
+
     return {
         "extracted_skills": merged_extracted,
         "strong_domains": [d for d in merged_strong if d] or ["General"],
         "missing_skills": merged_missing,
         "readiness_score": max(min(readiness, 100), 0),
         "roadmap": roadmap,
+        "resume_projects": resume_projects,
     }
 
 def analyze_resume_deep(text: str, role: str, level: str):
@@ -241,13 +252,15 @@ def analyze_resume_deep(text: str, role: str, level: str):
     {text[:4000]}
     
     TASK:
-    1. Extract technical skills and strong domains.
-    2. Identify CRITICAL GAPS specifically for the {role} role in today's market.
-    3. Generate a "Super Detailed Digital Roadmap".
+    1. Extract technical skills and strong domains from the resume.
+    2. MOST IMPORTANT: Extract ALL projects from the resume's PROJECTS section.
+       - For each project, extract: name, technologies used, and a brief description.
+    3. Identify CRITICAL GAPS specifically for the {role} role in today's market.
+    4. Generate a "Super Detailed Digital Roadmap".
        - Each category (Beginner, Intermediate, Advanced) must contain 3-4 MAJOR TOPICS.
        - Each major topic MUST be formatted as: "Main Topic Name: [Subtopic A, Subtopic B, Subtopic C]".
        - Ensure the content is extremely granular and tailored to the gaps found.
-    4. Provide 2-3 High-Impact Portfolio Project ideas.
+    5. Provide 2-3 High-Impact Portfolio Project ideas.
 
     Return ONLY a JSON object:
     {{
@@ -255,6 +268,10 @@ def analyze_resume_deep(text: str, role: str, level: str):
         "strong_domains": ["domain1"],
         "missing_skills": ["skillA", "skillB"],
         "readiness_score": 75,
+        "resume_projects": [
+            {{"name": "CodeX Intelligence Hub", "tech": "Python, FAISS, Groq, Streamlit", "description": "Built a high-performance RAG system for semantic search and code generation"}},
+            {{"name": "Exameye Shield", "tech": "Python, React, FastAPI, OpenCV, YoloV8", "description": "AI-based exam proctoring with real-time violation detection"}}
+        ],
         "roadmap": {{
             "beginner": ["Basics of X: [Syntax, Variables, Memory Management]", "Env Setup: [IDE, Docker, Git]"],
             "intermediate": ["System Design: [Scalability, Sharding, Load Balancing]", "..."],
