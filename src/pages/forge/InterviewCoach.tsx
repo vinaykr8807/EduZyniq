@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import API_BASE_URL from '../../config';
+import API_BASE_URL, { apiFetch } from '../../config';
 
 interface ResumeProject {
     name: string;
@@ -66,7 +66,7 @@ const saveInterviewSession = async (payload: object) => {
     try {
         const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
         if (!user?.email) return;
-        await fetch(`${API_BASE_URL}/save-interview-session`, {
+        await apiFetch(`${API_BASE_URL}/save-interview-session`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_email: user.email, ...payload })
@@ -188,7 +188,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setCodingPhase('approach'); setTestResults(null); setCodingEval(null); setConfirmSkip(false);
         try {
             const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
-            const res = await fetch(`${API_BASE_URL}/coach/mock-interview/plan`, {
+            const res = await apiFetch(`${API_BASE_URL}/coach/mock-interview/plan`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -214,7 +214,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setCodingPhase('approach'); setTestResults(null); setCodingEval(null);
         try {
             const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
-            const res = await fetch(`${API_BASE_URL}/coach/mock-interview/question`, {
+            const res = await apiFetch(`${API_BASE_URL}/coach/mock-interview/question`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -239,7 +239,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         if (!currentQuestion?.test_cases) return;
         setRunningTests(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/coach/mock-interview/run-tests`, {
+            const res = await apiFetch(`${API_BASE_URL}/coach/mock-interview/run-tests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code: userCode, language: codingLanguage, test_cases: currentQuestion.test_cases })
@@ -252,7 +252,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const submitCodingAnswer = async () => {
         setIsMockLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/coach/mock-interview/evaluate-code`, {
+            const res = await apiFetch(`${API_BASE_URL}/coach/mock-interview/evaluate-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -282,7 +282,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const submitMockAnswer = async () => {
         setIsMockLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/coach/mock-interview/evaluate`, {
+            const res = await apiFetch(`${API_BASE_URL}/coach/mock-interview/evaluate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, domain, question: currentQuestion.question, answer: userMockAnswer })
@@ -355,7 +355,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         try {
             const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
             if (!user.email) return;
-            await fetch(`${API_BASE_URL}/coach/mock-interview/save-session`, {
+            await apiFetch(`${API_BASE_URL}/coach/mock-interview/save-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_email: user.email, role, domain, language: codingLanguage, evaluations: evals })
@@ -377,7 +377,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         if (!user.email) return;
 
         // Fetch both resume status and student profile (which contains domain)
-        fetch(`${API_BASE_URL}/student/profile?user_email=${encodeURIComponent(user.email)}`)
+        apiFetch(`${API_BASE_URL}/student/profile?user_email=${encodeURIComponent(user.email)}`)
             .then((r) => r.json())
             .then((data) => {
                 if (data.has_stored_resume) setHasStoredResume(true);
@@ -394,7 +394,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setActiveTab('trends');
         try {
             const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
-            const response = await fetch(`${API_BASE_URL}/teacher/market-skills`, {
+            const response = await apiFetch(`${API_BASE_URL}/teacher/market-skills`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, domain, user_email: user.email })
@@ -413,7 +413,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setActiveTab('mentor');
         try {
             const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
-            const response = await fetch(`${API_BASE_URL}/coach/beginner-guide`, {
+            const response = await apiFetch(`${API_BASE_URL}/coach/beginner-guide`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, domain, user_email: user.email })
@@ -429,7 +429,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
     const fetchHistoricalTrends = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/coach/historical-trends`, {
+            const res = await apiFetch(`${API_BASE_URL}/coach/historical-trends`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, domain })
@@ -456,7 +456,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
         try {
             const [resumeRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/analyze-resume`, { method: 'POST', body: formData }),
+                apiFetch(`${API_BASE_URL}/analyze-resume`, { method: 'POST', body: formData }),
                 fetchMarketSkills()
             ]);
             fetchHistoricalTrends(); // Background load
