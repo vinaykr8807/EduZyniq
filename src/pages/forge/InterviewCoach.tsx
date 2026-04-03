@@ -1214,28 +1214,39 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
                                         <div className="flex-col gap-md">
                                             <h4 style={{ fontSize: '1rem', fontWeight: 800 }}>Performance Breakdown</h4>
-                                            {mockEvals.map((ev, i) => (
-                                                <div key={i} className="glass-card" style={{ padding: '1.5rem', borderLeft: `6px solid ${ev.overall_score >= 7 ? 'var(--accent-green)' : ev.overall_score >= 4 ? 'var(--accent-orange)' : 'var(--accent-red)'}` }}>
-                                                    <div className="flex justify-between items-start mb-md">
+                                            {mockEvals.map((ev, i) => {
+                                                const isSkipped = ev.overall_score === 0 && ev.weaknesses?.toLowerCase().includes('skipped');
+                                                const borderColor = isSkipped ? 'rgba(148,163,184,0.5)' : ev.overall_score >= 7 ? 'var(--accent-green)' : ev.overall_score >= 4 ? 'var(--accent-orange)' : 'var(--accent-red)';
+                                                return (
+                                                <div key={i} className="glass-card" style={{ padding: '1.5rem', borderLeft: `6px solid ${borderColor}` }}>
+                                                    <div className="flex justify-between items-start" style={{ marginBottom: '0.75rem' }}>
                                                         <div className="flex-col gap-xs">
-                                                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-muted)' }}>ROUND {i + 1}: {ev.type?.toUpperCase()}</span>
+                                                            <div className="flex items-center gap-sm">
+                                                                <span style={{ fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-muted)' }}>ROUND {i + 1}: {ev.type?.toUpperCase()}</span>
+                                                                {isSkipped && <span style={{ fontSize: '0.65rem', background: 'rgba(148,163,184,0.15)', color: '#94a3b8', padding: '2px 8px', borderRadius: '999px', border: '1px solid rgba(148,163,184,0.3)', fontWeight: 700 }}>⏩ SKIPPED</span>}
+                                                            </div>
                                                             <h5 style={{ fontSize: '1rem', fontWeight: 700 }}>{ev.question.slice(0, 100)}...</h5>
                                                         </div>
-                                                        <span style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--primary-500)' }}>{ev.overall_score}/10</span>
+                                                        {!isSkipped && <span style={{ fontSize: '1.5rem', fontWeight: 900, color: ev.overall_score >= 7 ? 'var(--accent-green)' : ev.overall_score >= 4 ? 'var(--accent-orange)' : 'var(--accent-red)' }}>{ev.overall_score}/10</span>}
                                                     </div>
-                                                    <div className="flex-col gap-sm" style={{ fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                                                        {ev.mentor_feedback && <p>{ev.mentor_feedback}</p>}
-                                                        {ev.advice && <p><strong>Coach Advice:</strong> {ev.advice}</p>}
-                                                        {ev.optimal_solution && <p><strong>Optimal Approach:</strong> {ev.optimal_solution}</p>}
-                                                        {ev.strengths && ev.strengths !== 'N/A' && <p style={{ color: 'var(--accent-green)' }}><strong>✅ Strength:</strong> {ev.strengths}</p>}
-                                                        {ev.weaknesses && ev.weaknesses !== 'N/A' && <p style={{ color: ev.overall_score === 0 ? 'var(--accent-red)' : 'var(--text-secondary)' }}><strong>⚠️ Opportunity:</strong> {ev.weaknesses}</p>}
-                                                        {ev.improved_answer && ev.improved_answer !== 'N/A' && <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', borderLeft: '3px solid var(--primary-500)', marginTop: '0.5rem' }}>
-                                                            <strong style={{ fontSize: '0.75rem', color: 'var(--primary-400)' }}>EXPERT SAMPLE ANSWER:</strong>
-                                                            <p style={{ marginTop: '0.3rem' }}>{ev.improved_answer}</p>
-                                                        </div>}
-                                                    </div>
+                                                    {isSkipped ? (
+                                                        <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>This question was skipped. For best results, attempt every question — even a partial answer helps the AI evaluate your thinking process.</p>
+                                                    ) : (
+                                                        <div className="flex-col gap-sm" style={{ fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                                            {ev.mentor_feedback && <p>{ev.mentor_feedback}</p>}
+                                                            {ev.advice && <p><strong>Coach Advice:</strong> {ev.advice}</p>}
+                                                            {ev.optimal_solution && <p><strong>Optimal Approach:</strong> {ev.optimal_solution}</p>}
+                                                            {ev.strengths && ev.strengths !== 'N/A' && <p style={{ color: 'var(--accent-green)' }}><strong>✅ Strength:</strong> {ev.strengths}</p>}
+                                                            {ev.weaknesses && ev.weaknesses !== 'N/A' && <p style={{ color: 'var(--text-secondary)' }}><strong>⚠️ To Improve:</strong> {ev.weaknesses}</p>}
+                                                            {ev.improved_answer && ev.improved_answer !== 'N/A' && <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', borderLeft: '3px solid var(--primary-500)', marginTop: '0.5rem' }}>
+                                                                <strong style={{ fontSize: '0.75rem', color: 'var(--primary-400)' }}>EXPERT SAMPLE ANSWER:</strong>
+                                                                <p style={{ marginTop: '0.3rem' }}>{ev.improved_answer}</p>
+                                                            </div>}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}

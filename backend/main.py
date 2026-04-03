@@ -1031,10 +1031,11 @@ class MockInterviewPlanReq(BaseModel):
     domain: str
     extracted_skills: List[str]
     user_email: Optional[str] = None
+    resume_context: Optional[str] = None
 
 @app.post("/coach/mock-interview/plan")
 def mock_interview_plan(req: MockInterviewPlanReq):
-    plan = build_mock_plan(req.role, req.domain, req.extracted_skills, req.user_email)
+    plan = build_mock_plan(req.role, req.domain, req.extracted_skills, req.user_email, req.resume_context)
     return {"plan": plan, "difficulty": "Easy", "questions": []}
 
 class MockInterviewEvalReq(BaseModel):
@@ -1055,10 +1056,11 @@ class MockInterviewQuestionReq(BaseModel):
     asked_questions: List[str]
     difficulty: str
     user_email: Optional[str] = None
+    resume_context: Optional[str] = None
 
 @app.post("/coach/mock-interview/question")
 def mock_interview_question(req: MockInterviewQuestionReq):
-    q = generate_mock_question(req.role, req.domain, req.plan_item, req.asked_questions, req.difficulty, req.user_email)
+    q = generate_mock_question(req.role, req.domain, req.plan_item, req.asked_questions, req.difficulty, req.user_email, req.resume_context)
     return q
 
 class MockCodingEvalReq(BaseModel):

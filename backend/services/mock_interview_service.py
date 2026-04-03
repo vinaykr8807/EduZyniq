@@ -108,7 +108,7 @@ def get_most_asked_questions(role: str, domain: str) -> str:
 
 DIFFICULTY_PROGRESSION = ["Easy", "Easy", "Medium", "Medium", "Hard"]
 
-def build_mock_plan(role: str, domain: str, extracted_skills: list, user_email: str | None = None) -> list:
+def build_mock_plan(role: str, domain: str, extracted_skills: list, user_email: str | None = None, resume_context: str | None = None) -> list:
     """
     Build a 6-step plan:
       1. Easy fundamental
@@ -138,30 +138,42 @@ def build_mock_plan(role: str, domain: str, extracted_skills: list, user_email: 
         pool = [s for s in from_list if s]
         return random.choice(pool) if pool else random.choice(skill_pool)
 
+    # Extract project names from resume_context if available
+    project_names = []
+    if resume_context:
+        try:
+            rc = json.loads(resume_context)
+            project_names = rc.get("projects", []) or rc.get("strong_domains", [])
+        except Exception:
+            pass
+
     plan = [
-        # --- Behavioural/Conceptual rounds ---
-        {"type": "fundamental",  "skill": pick(*all_skills),           "difficulty": "Easy"},
-        {"type": "technical",    "skill": pick(*all_skills),           "difficulty": "Easy"},
+        # --- Round 1: Fundamental concept ---
+        {"type": "fundamental",  "skill": pick(*all_skills), "difficulty": "Easy"},
+        # --- Round 2: Technical depth ---
+        {"type": "technical",    "skill": pick(*all_skills), "difficulty": "Easy"},
+        # --- Round 3: Resume Project Discussion ---
+        {
+            "type": "project",
+            "skill": random.choice(project_names) if project_names else pick(*all_skills),
+            "difficulty": "Medium",
+            "note": f"Resume project deep-dive: {random.choice(project_names) if project_names else 'your most complex project'}",
+        },
+        # --- Round 4: Skill-Gap or Past weakness ---
         {
             "type": "scenario",
-            "skill": pick(*([random.choice(past_weak)] if past_weak else all_skills)),
+            "skill": pick(*(missing_skills[:3] if missing_skills else ([random.choice(past_weak)] if past_weak else all_skills))),
             "difficulty": "Medium",
-            "note": f"Past-mistake focus: {past_weak[0]}" if past_weak else "N/A",
+            "note": "Skill-Gap Audit" if missing_skills else (f"Past-mistake focus: {past_weak[0]}" if past_weak else "N/A"),
         },
-        {
-            "type": "technical",
-            "skill": pick(*(missing_skills[:3] if missing_skills else all_skills)),
-            "difficulty": "Medium",
-            "note": "Skill-Gap Audit" if missing_skills else "N/A",
-        },
-        # --- Coding challenge ---
+        # --- Round 5: Coding challenge ---
         {
             "type": "coding",
             "skill": random.choice(dsa_topics),
             "difficulty": random.choice(["Easy", "Medium"]),
             "note": "LeetCode-style — focus on core algorithm or data structure",
         },
-        # --- Final hard round ---
+        # --- Round 6: Behavioral / Leadership ---
         {
             "type": "behavioral",
             "skill": "Project Impact & Metrics" if (context and context["session"].get("ats_score", {}).get("total_score", 100) < 70) else "Leadership & Adaptability",
@@ -183,30 +195,77 @@ def generate_mock_question(
     asked: list,
     difficulty: str,
     user_email: str | None = None,
+    resume_context: str | None = None,
 ) -> dict:
     context = _get_user_context(user_email)
-    web_ctx = get_most_asked_questions(role, domain)
 
-    resume_skills = ", ".join(context["session"].get("extracted_skills", [])) if context else ""
-    missing = ", ".join(context["session"].get("missing_skills", [])) if context else ""
-    ats_score = context["session"].get("ats_score", {}).get("total_score", "N/A") if context else "N/A"
+    # Parse resume context from frontend (more up-to-date than DB session)
+    resume_data = {}
+    if resume_context:
+        try:
+            resume_data = json.loads(resume_context)
+        except Exception:
+            pass
+
+    # Merge skills: prefer frontend resume_context, fallback to DB session
+    resume_skills_list = (resume_data.get("extracted_skills") or
+                          (context["session"].get("extracted_skills", []) if context else []))
+    missing_list = (resume_data.get("missing_skills") or
+                    (context["session"].get("missing_skills", []) if context else []))
+    projects_raw = resume_data.get("projects") or resume_data.get("strong_domains") or []
+    resume_skills = ", ".join(resume_skills_list)
+    missing = ", ".join(missing_list)
+    projects_str = ", ".join([str(p) for p in projects_raw]) if projects_raw else "not specified"
+    ats_score = (resume_data.get("ats_score", {}).get("total_score") or
+                 (context["session"].get("ats_score", {}).get("total_score", "N/A") if context else "N/A"))
     past_weak = _past_weak_areas(context)
 
     effective_difficulty = plan_item.get("difficulty", difficulty)
 
     # ── Coding question path ──────────────────────────────────────────────
     if plan_item.get("type") == "coding":
-        return generate_coding_challenge(role, domain, plan_item, asked, effective_difficulty, user_email)
+        return generate_coding_challenge(role, domain, plan_item, asked, effective_difficulty, user_email, resume_context)
 
-    # ── Standard question path ─────────────────────────────────────────────
+    # ── Project deep-dive path ────────────────────────────────────────────
+    is_project_round = plan_item.get("type") == "project"
+    project_note = plan_item.get("note", "")
+
+    if is_project_round:
+        prompt = f"""
+You are a senior technical interviewer hiring a {role}.
+The candidate listed the following projects on their resume: {projects_str}
+
+Your job is to ask a SPECIFIC, DEEP question about one of these real projects.
+Do NOT ask generic questions. Reference the actual project or technology they used.
+
+Focus project/skill: {plan_item.get('skill', 'their main project')}
+Difficulty: {effective_difficulty}
+
+Already asked (DO NOT REPEAT):
+{json.dumps(asked)}
+
+Return ONLY valid JSON:
+{{
+  "question": "A direct, specific question referencing the candidate's actual project or technology they built.",
+  "category": "project",
+  "difficulty": "{effective_difficulty}",
+  "expected_key_points": ["Technical depth", "Design decisions", "Challenges overcome", "Outcome & impact"]
+}}
+"""
+        res = _llm(prompt, 0.6)
+        if res and "question" in res:
+            return res
+
+    # ── Standard/Technical/Behavioral question path ───────────────────────
     prompt = f"""
 You are a senior technical interviewer hiring a {role} in the {domain} domain.
 
-CANDIDATE PROFILE:
-- Resume Skills   : {resume_skills}
-- Skill Gaps      : {missing}
-- ATS Score       : {ats_score}
-- Past Weak Areas : {', '.join(past_weak) or 'None'}
+CANDIDATE PROFILE (from their uploaded resume):
+- Skills on Resume : {resume_skills}
+- Resume Projects  : {projects_str}
+- Skill Gaps       : {missing}
+- ATS Score        : {ats_score}
+- Past Weak Areas  : {', '.join(past_weak) or 'None'}
 
 INTERVIEW STEP:
 - Type       : {plan_item['type']}
@@ -214,19 +273,14 @@ INTERVIEW STEP:
 - Note       : {plan_item.get('note', 'N/A')}
 - Difficulty : {effective_difficulty}
 
-MARKET CONTEXT (use as backdrop):
-{web_ctx[:600]}
-
-ALREADY ASKED (DO NOT REPEAT EXACT WORDING):
-{json.dumps(asked)}
-
-RULES:
-1. Vary difficulty: Easy = basic concepts, Medium = application/design, Hard = trade-offs/impact.
-2. If Note = "Skill-Gap Audit" — probe how the candidate would learn or compensate.
-3. If Note = "ATS Gap" — ask candidate to quantify a past achievement with metrics.
-4. If Note = "Past-mistake focus" — revisit the weak area in a new angle.
-5. Keep question concise (1–2 sentences).
-6. DO NOT repeat questions from the already-asked list.
+STRICT RULES:
+1. Ask ONLY about the candidate's resume (skills they listed, projects they built).
+2. DO NOT ask about job postings, company requirements, or external market trends.
+3. If type is "project" or note mentions a project, reference it by name.
+4. If Note = "Skill-Gap Audit" — probe how the candidate would learn or compensate for a gap.
+5. If Note = "Past-mistake focus" — revisit the weak area from a new angle.
+6. Keep question concise (1–3 sentences max).
+7. NEVER repeat: {json.dumps(asked)}
 
 Return ONLY valid JSON:
 {{
@@ -236,15 +290,15 @@ Return ONLY valid JSON:
   "expected_key_points": ["point1", "point2", "point3"]
 }}
 """
-    res = _llm(prompt, 0.65)
+    res = _llm(prompt, 0.6)
     if res and "question" in res:
         return res
     # Fallback
     return {
-        "question": f"Can you walk me through how you would handle a real-world challenge involving {plan_item['skill']}?",
+        "question": f"Can you walk me through how you built or designed something using {plan_item['skill']} in one of your projects?",
         "category": plan_item["type"],
         "difficulty": effective_difficulty,
-        "expected_key_points": ["Clear explanation", "Approach", "Outcome"],
+        "expected_key_points": ["Clear explanation", "Design rationale", "Outcome"],
     }
 
 
@@ -259,6 +313,7 @@ def generate_coding_challenge(
     asked: list,
     difficulty: str,
     user_email: str | None = None,
+    resume_context: str | None = None,
 ) -> dict:
     context = _get_user_context(user_email)
     resume_skills = ", ".join(context["session"].get("extracted_skills", [])) if context else ""
