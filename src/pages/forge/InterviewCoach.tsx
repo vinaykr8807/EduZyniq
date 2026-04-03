@@ -212,7 +212,8 @@ export const InterviewCoach = ({ onComplete }: any) => {
                     plan_item: planItem,
                     asked_questions: asked,
                     difficulty: planItem.difficulty || mockDifficulty,
-                    user_email: user.email
+                    user_email: user.email,
+                    resume_context: result ? JSON.stringify(result) : ""
                 })
             });
             const data = await res.json();
