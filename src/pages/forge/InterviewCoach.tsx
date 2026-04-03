@@ -184,7 +184,8 @@ export const InterviewCoach = ({ onComplete }: any) => {
                 body: JSON.stringify({
                     role, domain,
                     extracted_skills: result?.extracted_skills || [],
-                    user_email: user.email
+                    user_email: user.email,
+                    resume_context: result ? JSON.stringify(result) : ""
                 })
             });
             const data = await res.json();
@@ -1221,7 +1222,17 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                         </div>
                                                         <span style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--primary-500)' }}>{ev.overall_score}/10</span>
                                                     </div>
-                                                    <p style={{ fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--text-secondary)' }}>{ev.mentor_feedback || ev.advice || ev.optimal_solution}</p>
+                                                    <div className="flex-col gap-sm" style={{ fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                                        {ev.mentor_feedback && <p>{ev.mentor_feedback}</p>}
+                                                        {ev.advice && <p><strong>Coach Advice:</strong> {ev.advice}</p>}
+                                                        {ev.optimal_solution && <p><strong>Optimal Approach:</strong> {ev.optimal_solution}</p>}
+                                                        {ev.strengths && ev.strengths !== 'N/A' && <p style={{ color: 'var(--accent-green)' }}><strong>✅ Strength:</strong> {ev.strengths}</p>}
+                                                        {ev.weaknesses && ev.weaknesses !== 'N/A' && <p style={{ color: ev.overall_score === 0 ? 'var(--accent-red)' : 'var(--text-secondary)' }}><strong>⚠️ Opportunity:</strong> {ev.weaknesses}</p>}
+                                                        {ev.improved_answer && ev.improved_answer !== 'N/A' && <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', borderLeft: '3px solid var(--primary-500)', marginTop: '0.5rem' }}>
+                                                            <strong style={{ fontSize: '0.75rem', color: 'var(--primary-400)' }}>EXPERT SAMPLE ANSWER:</strong>
+                                                            <p style={{ marginTop: '0.3rem' }}>{ev.improved_answer}</p>
+                                                        </div>}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
