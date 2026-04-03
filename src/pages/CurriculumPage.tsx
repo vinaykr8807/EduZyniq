@@ -208,22 +208,6 @@ export const CurriculumPage = () => {
                             </div>
                         ))}
                     </div>
-
-                    {/* Bottom CTA */}
-                    <div style={{
-                        marginTop: '2rem', padding: '4rem 2rem', borderRadius: '32px',
-                        textAlign: 'center',
-                        background: 'var(--glass-bg)', backdropFilter: 'blur(20px)',
-                        border: '1px solid var(--glass-border)', boxShadow: 'var(--shadow-lg)'
-                    }}>
-                        <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Ready to begin?</h3>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '2.5rem' }}>
-                            Start your journey in {selectedRoadmap.title} today.
-                        </p>
-                        <button className="btn btn-primary" style={{ padding: '1rem 3.5rem', borderRadius: '12px', fontWeight: 800, fontSize: '1rem' }}>
-                            Start This Journey <span>→</span>
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
