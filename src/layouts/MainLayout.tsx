@@ -16,7 +16,7 @@ export const MainLayout = () => {
                     borderTop: '1px solid var(--glass-border)',
                 }} className="text-center">
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                        © 2026 Edunovas. All rights reserved.
+                        © 2026 EduZyniq. All rights reserved.
                     </p>
                 </footer>
             )}

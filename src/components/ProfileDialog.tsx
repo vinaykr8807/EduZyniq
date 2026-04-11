@@ -39,7 +39,7 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ onSave, onClose, t
         setError(null);
         const formData = new FormData();
         formData.append('file', file);
-        const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+        const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (user.email) formData.append('user_email', user.email);
 
         try {

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useEdunovas } from '../hooks/useEdunovas';
+import { useEduZyniq } from '../hooks/useEduZyniq';
 import { CURRICULUM_DATA, type Roadmap } from '../data/curriculumData';
 
 export const CurriculumPage = () => {
-    const { profile } = useEdunovas();
+    const { profile } = useEduZyniq();
     const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap>(CURRICULUM_DATA[0]);
 
     useEffect(() => {

@@ -1,6 +1,6 @@
-# Edunovas Deployment Workflow (Vercel + Cloudflare Tunnel)
+# EduZyniq Deployment Workflow (Vercel + Cloudflare Tunnel)
 
-This workflow describes how to deploy the **Edunovas** platform using Vercel for the Frontend and a Cloudflare Tunnel for the Backend (enabling secure access to your local or private server without opening ports).
+This workflow describes how to deploy the **EduZyniq** platform using Vercel for the Frontend and a Cloudflare Tunnel for the Backend (enabling secure access to your local or private server without opening ports).
 
 ## Prerequisites
 - [Vercel CLI](https://vercel.com/docs/cli) installed (npm i -g vercel)
@@ -12,7 +12,7 @@ This workflow describes how to deploy the **Edunovas** platform using Vercel for
 1. **Login to Cloudflared**:
    `cloudflared tunnel login`
 2. **Create a Tunnel**:
-   `cloudflared tunnel create edunovas-backend`
+   `cloudflared tunnel create eduzyniq-backend`
 3. **Configure the Tunnel**:
    Create a `config.yml` in your Cloudfare directory (usually `~/.cloudflared/`):
    ```yaml
@@ -26,9 +26,9 @@ This workflow describes how to deploy the **Edunovas** platform using Vercel for
      - service: http_status:404
    ```
 4. **Route DNS**:
-   `cloudflared tunnel route dns edunovas-backend api.yourdomain.com`
+   `cloudflared tunnel route dns eduzyniq-backend api.yourdomain.com`
 5. **Run the Tunnel**:
-   `cloudflared tunnel run edunovas-backend`
+   `cloudflared tunnel run eduzyniq-backend`
 
 ## Step 2: Frontend Deployment (Vercel)
 

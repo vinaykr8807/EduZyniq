@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useEdunovas } from '../hooks/useEdunovas';
+import { useEduZyniq } from '../hooks/useEduZyniq';
 import { PERSONAS } from '../data/personas';
 import { ChatWindow } from '../components/ChatWindow';
 import { ProfileDialog } from '../components/ProfileDialog';
@@ -14,7 +14,7 @@ import { Teacher } from './forge/Teacher';
 import { Analytics } from './forge/Analytics';
 
 export const Assistant = () => {
-    const { activeMode, setActiveMode, messages, isTyping, sendMessage, profile, updateProfile, progress, fetchProgress, stats, fetchStats } = useEdunovas();
+    const { activeMode, setActiveMode, messages, isTyping, sendMessage, profile, updateProfile, progress, fetchProgress, stats, fetchStats } = useEduZyniq();
     const [showProfileDialog, setShowProfileDialog] = useState(false);
 
     // View state: 'dashboard' | 'chat' | 'interview' | 'quiz' | 'coding' | 'pathfinder'
@@ -22,7 +22,7 @@ export const Assistant = () => {
 
     useEffect(() => {
         // Prevent showing if already shown in this session or if profile exists
-        const hasDismissed = sessionStorage.getItem('edunovas_onboarding_dismissed');
+        const hasDismissed = sessionStorage.getItem('eduzyniq_onboarding_dismissed');
 
         if (progress && progress.profile_completed === false && !profile && !hasDismissed) {
             setShowProfileDialog(true);
@@ -32,12 +32,12 @@ export const Assistant = () => {
     const handleProfileSave = (p: any) => {
         updateProfile(p);
         setShowProfileDialog(false);
-        sessionStorage.setItem('edunovas_onboarding_dismissed', 'true');
+        sessionStorage.setItem('eduzyniq_onboarding_dismissed', 'true');
     };
 
     const handleProfileClose = () => {
         setShowProfileDialog(false);
-        sessionStorage.setItem('edunovas_onboarding_dismissed', 'true');
+        sessionStorage.setItem('eduzyniq_onboarding_dismissed', 'true');
     };
 
     const handleModeSelect = (modeId: string) => {

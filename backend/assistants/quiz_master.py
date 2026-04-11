@@ -28,9 +28,9 @@ def generate_dynamic_quiz(subject: str, topic: str, difficulty: str, mode: str =
     
     # Mode-specific prompt additions
     if mode == "targeted":
-        instruction = f"This is a TARGETED RECOVERY QUIZ. The student has shown weakness in: {subtopic or topic}. Generate questions that specifically diagnose their misunderstanding and rebuild their confidence with clear, constructive feedback in the explanations. Focus deeply on the core mechanics."
+        instruction = f"This is a TARGETED RECOVERY QUIZ. The student has shown weakness in: {subtopic or topic}. Generate questions that specifically diagnose their misunderstanding. For fill-in-the-blank types, use declarative statements with blanks (_______)."
     else:
-        instruction = "Generate a 10-question mixed-mode technical assessment. Include a mix of: 1. Standard conceptual MCQs, 2. Subtle True/False technical nuances, 3. 'Match the Following' permutations, 4. Code Completion logic (____), and 5. Image-Based analysis (provide a 'visual_query'). Ensure the difficulty scales from basic to advanced."
+        instruction = f"Generate a 10-question mixed-mode technical assessment. Include a mix of: 1. Conceptual MCQs, 2. True/False nuances, 3. 'Match the Following' (4 pairs), 4. Fill-in-the-blank statements (_______), and 5. Image-Based analysis. Difficulty: {difficulty}."
 
     prompt = f"""
     You are an expert technical interviewer and educator. 
@@ -44,7 +44,7 @@ def generate_dynamic_quiz(subject: str, topic: str, difficulty: str, mode: str =
     - Generate 10 questions.
     - Format: JSON object with "quiz" key containing a list.
     - Each question must have: 
-        "question": string (conceptual prompt),
+        "question": string (conceptual prompt or statement),
         "options": list of 4 strings (REQUIRED),
         "answer": string (exactly matches one option),
         "explanation": string,
@@ -53,6 +53,11 @@ def generate_dynamic_quiz(subject: str, topic: str, difficulty: str, mode: str =
         "matching_pairs": JSON object (ONLY if type is 'matching'),
         "visual_query": string (if relevant)
     
+    For 'code_completion' type (Fill in the Blanks):
+    - The "question" MUST be a declarative statement or a code snippet where the answer is replaced by '_______'.
+    - DO NOT use interrogative forms (e.g., 'What is...?', 'How do you...?').
+    - Example: 'In React, the _______ hook is used to manage local state.' (Option/Answer: 'useState')
+
     For topic_tag:
     - 'Theory': Historical context, definitions, and high-level concepts.
     - 'Logic': Algorithmic snippets, problem-solving, and logic flows.

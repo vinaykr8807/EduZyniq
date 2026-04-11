@@ -42,7 +42,7 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {
-        "message": "Welcome to Edunovas AI Backend",
+        "message": "Welcome to EduZyniq AI Backend",
         "status": "Online",
         "documentation": "/docs",
         "health": "/health"
@@ -151,7 +151,7 @@ def _load_resume_text(file: Optional[UploadFile], user_email: Optional[str]):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "message": "Edunovas Backend is Alive"}
+    return {"status": "ok", "message": "EduZyniq Backend is Alive"}
 
 class UserAuth(BaseModel):
     email: str
@@ -1410,7 +1410,7 @@ def admin_risk_overview():
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting Edunovas Backend...")
+    print("🚀 Starting EduZyniq Backend...")
     uvicorn.run(app, host="0.0.0.0", port=8000)
 @app.get("/student/weak-areas")
 def get_weak_areas(user_email: str):

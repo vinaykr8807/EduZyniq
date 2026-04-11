@@ -1,4 +1,4 @@
-# Edunovas Frontend — UI Recreation Prompt
+# EduZyniq Frontend — UI Recreation Prompt
 
 ## Stack
 React 19 + TypeScript + Vite + React Router v6. Backend at `http://127.0.0.1:8000`.
@@ -50,7 +50,7 @@ React 19 + TypeScript + Vite + React Router v6. Backend at `http://127.0.0.1:800
 /admin        → MainLayout > AdminDashboard  [ProtectedRoute: role=admin]
 ```
 
-Auth: read `localStorage.edunovas_user` → `{ email, role, token, full_name }`. Missing → `/login`. Role mismatch → `/`.
+Auth: read `localStorage.eduzyniq_user` → `{ email, role, token, full_name }`. Missing → `/login`. Role mismatch → `/`.
 
 ---
 
@@ -74,7 +74,7 @@ Full-screen centered frosted-glass card on a soft light-blue gradient background
 **API:**
 - `POST /login` → `{ email, password, role }`
 - `POST /signup` → `{ email, password, role, full_name }`
-- Store `{ email, role, token, full_name }` in `localStorage.edunovas_user`
+- Store `{ email, role, token, full_name }` in `localStorage.eduzyniq_user`
 - Redirect: admin → `/admin`, student → `/assistant`
 
 ---
@@ -82,7 +82,7 @@ Full-screen centered frosted-glass card on a soft light-blue gradient background
 ### Navbar (fixed, all routes except `/login`)
 
 - Style: translucent light glass bar with blur, thin border, and subtle bottom shadow
-- Logo: clean blue mark + "Edunovas" wordmark
+- Logo: clean blue mark + "EduZyniq" wordmark
 - Links: Home, Curriculum + "Career Forge" (student) or "Dashboard" (admin)
 - Active link: `--primary` color with slim underline, matching the screenshots
 - Right: Login button (guest) OR email + Logout button
@@ -137,7 +137,7 @@ Shell page. `view` state controls active module: `dashboard | chat | interview |
 
 **Top bar:** Back button (non-dashboard) + `SYSTEM_STATUS: OPERATIONAL` badge inside a compact glass strip.
 
-**Profile Dialog (modal, first visit):** Shown if `progress.profile_completed === false`. Fields: Degree, Year, Domain, Branch. Optional resume upload → `POST /upload-resume`. Save → `POST /save-profile?user_email=`. Dismissed via `sessionStorage.edunovas_onboarding_dismissed`. Modal should use bright glassmorphism, pale blue field backgrounds, soft blur, and clean professional spacing.
+**Profile Dialog (modal, first visit):** Shown if `progress.profile_completed === false`. Fields: Degree, Year, Domain, Branch. Optional resume upload → `POST /upload-resume`. Save → `POST /save-profile?user_email=`. Dismissed via `sessionStorage.eduzyniq_onboarding_dismissed`. Modal should use bright glassmorphism, pale blue field backgrounds, soft blur, and clean professional spacing.
 
 **Module map:**
 | view | Component |
@@ -151,7 +151,7 @@ Shell page. `view` state controls active module: `dashboard | chat | interview |
 | stats | Analytics |
 | chat | ChatWindow |
 
-**Hook `useEdunovas`:** manages activeMode, messages, isTyping, profile, progress, stats. All fetches to `http://127.0.0.1:8000`.
+**Hook `useEduZyniq`:** manages activeMode, messages, isTyping, profile, progress, stats. All fetches to `http://127.0.0.1:8000`.
 
 ---
 
@@ -397,14 +397,14 @@ Glass card with icon, name, tagline. Active state: blue border + subtle glow dot
 
 | # | Rule |
 |---|------|
-| 1 | Profile dialog: once per session via `sessionStorage.edunovas_onboarding_dismissed` |
+| 1 | Profile dialog: once per session via `sessionStorage.eduzyniq_onboarding_dismissed` |
 | 2 | Teacher/InterviewCoach/QuizMaster auto-select domain from `profile.domain` on mount |
 | 3 | CodingMentor resets all state on language change |
 | 4 | CodingMentor debounces line analysis 1200ms after code edit |
 | 5 | Mock interview uses Web Speech API (continuous, interim results) |
 | 6 | Teacher doubt supports image file attachments (multimodal endpoint) |
 | 7 | Admin fetches all 5 endpoints in parallel on mount |
-| 8 | All user emails from `JSON.parse(localStorage.edunovas_user || '{}').email` |
+| 8 | All user emails from `JSON.parse(localStorage.eduzyniq_user || '{}').email` |
 | 9 | Quiz confidence slider persists per question index |
 | 10 | Navbar shows role-specific links based on `user.role` |
 

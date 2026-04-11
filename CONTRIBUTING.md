@@ -1,14 +1,14 @@
-# Contributing to Edunovas
+# Contributing to EduZyniq
 
-Thank you for your interest in contributing to Edunovas! 🎉
+Thank you for your interest in contributing to EduZyniq! 🎉
 
 ## Getting Started
 
 1. **Fork the repository**
 2. **Clone your fork**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/Edunovas.git
-   cd Edunovas
+   git clone https://github.com/YOUR_USERNAME/EduZyniq.git
+   cd EduZyniq
    ```
 
 3. **Set up development environment**
@@ -76,6 +76,6 @@ Thank you for your interest in contributing to Edunovas! 🎉
 
 - Open an issue for bugs or feature requests
 - Join discussions in GitHub Discussions
-- Contact: support@edunovas.ai
+- Contact: support@eduzyniq.ai
 
 Thank you for contributing! 🚀

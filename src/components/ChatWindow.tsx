@@ -101,7 +101,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isTyping, onSe
             <form onSubmit={handleSubmit} style={{ position: 'relative' }}>
                 <input
                     className="input-field"
-                    placeholder="Ask Edunovas anything..."
+                    placeholder="Ask EduZyniq anything..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     disabled={isTyping}

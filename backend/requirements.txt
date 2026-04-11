@@ -3,7 +3,7 @@ uvicorn
 groq
 pydantic
 python-dotenv
-requests
+requests>=2.33.1
 python-multipart
 pytesseract
 pillow
@@ -18,7 +18,7 @@ pdfplumber
 duckduckgo-search
 reportlab
 faiss-cpu
-numpy
+numpy<2.0.0
 trafilatura
 sentence-transformers
 playwright

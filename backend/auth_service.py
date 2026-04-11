@@ -5,7 +5,7 @@ from typing import Optional
 from jose import JWTError, jwt
 
 # JWT configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "edunovas_ultra_secure_secret_777_!!!")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "eduzyniq_ultra_secure_secret_777_!!!")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 hours
 

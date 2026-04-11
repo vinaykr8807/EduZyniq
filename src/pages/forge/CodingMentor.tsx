@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useEdunovas } from '../../hooks/useEdunovas';
+import { useEduZyniq } from '../../hooks/useEduZyniq';
 
 const API = 'http://127.0.0.1:8000';
 
 const LANG_CONFIG: Record<string, { label: string; ext: string; icon: string; template: string }> = {
-    python:     { label: 'Python 3.11',  ext: 'app.py',    icon: '🐍', template: 'print("Hello Edunovas!")' },
-    javascript: { label: 'Node.js 20',   ext: 'index.js',  icon: '🟨', template: 'console.log("Hello Edunovas!");' },
-    java:       { label: 'Java 17',      ext: 'Main.java', icon: '☕', template: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello Edunovas!");\n    }\n}' },
-    cpp:        { label: 'C++ (GCC)',    ext: 'main.cpp',  icon: '⚙️', template: '#include <iostream>\n\nint main() {\n    std::cout << "Hello Edunovas!" << std::endl;\n    return 0;\n}' },
-    go:         { label: 'Go 1.21',      ext: 'main.go',   icon: '🩵', template: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello Edunovas!")\n}' },
-    rust:       { label: 'Rust 1.72',    ext: 'main.rs',   icon: '🦀', template: 'fn main() {\n    println!("Hello Edunovas!");\n}' },
-    php:        { label: 'PHP 8.2',      ext: 'index.php', icon: '🐘', template: '<?php\necho "Hello Edunovas!";' },
-    ruby:       { label: 'Ruby 3.2',     ext: 'app.rb',    icon: '💎', template: 'puts "Hello Edunovas!"' },
+    python:     { label: 'Python 3.11',  ext: 'app.py',    icon: '🐍', template: 'print("Hello EduZyniq!")' },
+    javascript: { label: 'Node.js 20',   ext: 'index.js',  icon: '🟨', template: 'console.log("Hello EduZyniq!");' },
+    java:       { label: 'Java 17',      ext: 'Main.java', icon: '☕', template: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello EduZyniq!");\n    }\n}' },
+    cpp:        { label: 'C++ (GCC)',    ext: 'main.cpp',  icon: '⚙️', template: '#include <iostream>\n\nint main() {\n    std::cout << "Hello EduZyniq!" << std::endl;\n    return 0;\n}' },
+    go:         { label: 'Go 1.21',      ext: 'main.go',   icon: '🩵', template: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello EduZyniq!")\n}' },
+    rust:       { label: 'Rust 1.72',    ext: 'main.rs',   icon: '🦀', template: 'fn main() {\n    println!("Hello EduZyniq!");\n}' },
+    php:        { label: 'PHP 8.2',      ext: 'index.php', icon: '🐘', template: '<?php\necho "Hello EduZyniq!";' },
+    ruby:       { label: 'Ruby 3.2',     ext: 'app.rb',    icon: '💎', template: 'puts "Hello EduZyniq!"' },
 };
 
 type Tab = 'problem' | 'editor' | 'output' | 'analysis' | 'references' | 'tests' | 'enhance';
@@ -49,7 +49,7 @@ export const CodingMentor = ({ onComplete }: any) => {
     const [compareResults, setCompareResults] = useState<any[]>([]);
     const codeLocked = !problemDesc.trim();
 
-    const { profile } = useEdunovas();
+    const { profile } = useEduZyniq();
 
     const alignmentTimer = useRef<any>(null);
     const codeRef = useRef(code);

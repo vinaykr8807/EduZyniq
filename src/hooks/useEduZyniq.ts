@@ -2,28 +2,28 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Mode, ChatMessage, StudentProfile, User } from '../types';
 import API_BASE_URL, { apiFetch } from '../config';
 
-export const useEdunovas = () => {
+export const useEduZyniq = () => {
     const [activeMode, setActiveMode] = useState<Mode>('ROUTER');
 
     // Get user from storage
     const getLocalUser = useCallback((): User | null => {
-        const saved = localStorage.getItem('edunovas_user');
+        const saved = localStorage.getItem('eduzyniq_user');
         if (!saved) return null;
         try {
             return JSON.parse(saved);
         } catch (e) {
-            localStorage.removeItem('edunovas_user');
+            localStorage.removeItem('eduzyniq_user');
             return null;
         }
     }, []);
 
     const [profile, setProfile] = useState<StudentProfile | null>(() => {
-        const saved = localStorage.getItem('edunovas_profile');
+        const saved = localStorage.getItem('eduzyniq_profile');
         if (!saved) return null;
         try {
             return JSON.parse(saved);
         } catch (e) {
-            localStorage.removeItem('edunovas_profile');
+            localStorage.removeItem('eduzyniq_profile');
             return null;
         }
     });
@@ -79,7 +79,7 @@ export const useEdunovas = () => {
 
     const updateProfile = useCallback(async (p: StudentProfile) => {
         setProfile(p);
-        localStorage.setItem('edunovas_profile', JSON.stringify(p));
+        localStorage.setItem('eduzyniq_profile', JSON.stringify(p));
 
         const user = getLocalUser();
         if (!user) return;

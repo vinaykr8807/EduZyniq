@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SkillGap3D } from '../components/SkillGap3D';
 
 interface Analytics {
     total_students: number;
@@ -107,7 +108,7 @@ export const AdminDashboard: React.FC = () => {
                         </div>
                         <div>
                             <h1 style={{ fontSize: '1.75rem', fontWeight: 900 }}>Admin Console</h1>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Edunovas Learning Intelligence Platform</p>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>EduZyniq Learning Intelligence Platform</p>
                         </div>
                     </div>
                 </div>
@@ -251,6 +252,33 @@ export const AdminDashboard: React.FC = () => {
                                 </div>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Platform-Wide Skill Gap */}
+                    <div className="glass-card" style={{ padding: '2rem', gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: '1rem', color: 'var(--primary-600)', textAlign: 'center' }}>
+                            🌌 Platform-Wide Skill Matrix
+                        </h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '2rem', textAlign: 'center', maxWidth: '600px' }}>
+                            Visualizing the aggregate performance of all students against the "Unicorn Candidate" benchmark.
+                        </p>
+                        <SkillGap3D 
+                            labels={['Algorithmic', 'Conceptual', 'Interviewing', 'System Design', 'Real-world Fit']}
+                            current={{
+                                'Algorithmic': data?.avg_optimization_score ?? 35,
+                                'Conceptual': (data?.total_interaction_hits ?? 0) > 100 ? 80 : 45,
+                                'Interviewing': data?.avg_readiness_score ?? 30,
+                                'System Design': 40,
+                                'Real-world Fit': (data?.total_interviews ?? 0) > 10 ? 60 : 25
+                            }}
+                            dream={{
+                                'Algorithmic': 90,
+                                'Conceptual': 85,
+                                'Interviewing': 95,
+                                'System Design': 80,
+                                'Real-world Fit': 90
+                            }}
+                        />
                     </div>
                 </div>
             )}
@@ -557,6 +585,35 @@ export const AdminDashboard: React.FC = () => {
                                                             </div>
                                                         </div>
                                                     )}
+                                                    {/* Skill Gap 3D Visualization */}
+                                                    <div className="flex-col gap-sm" style={{ 
+                                                        padding: '1.50rem', 
+                                                        background: 'var(--glass-bg)', 
+                                                        borderRadius: '20px', 
+                                                        border: '1px solid var(--glass-border)',
+                                                        gridColumn: 'span 2'
+                                                    }}>
+                                                        <p style={{ fontSize: '0.8rem', fontWeight: 900, color: 'var(--primary-600)', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                                            🌌 3D Skill Gap Analysis (vs. Industry Benchmark)
+                                                        </p>
+                                                        <SkillGap3D 
+                                                            labels={['Technical', 'Knowledge', 'Readiness', 'Optimization', 'Market Fit']}
+                                                            current={{
+                                                                'Technical': student.avg_optimization_score || 40,
+                                                                'Knowledge': student.avg_quiz_score || 50,
+                                                                'Readiness': student.avg_readiness || 30,
+                                                                'Optimization': (student.code_optimizations_done / 3) * 10 || 20,
+                                                                'Market Fit': student.domains_studied.length * 20 || 10
+                                                            }}
+                                                            dream={{
+                                                                'Technical': 85,
+                                                                'Knowledge': 90,
+                                                                'Readiness': 80,
+                                                                'Optimization': 75,
+                                                                'Market Fit': 85
+                                                            }}
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}

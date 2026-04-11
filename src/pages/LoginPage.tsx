@@ -16,7 +16,15 @@ export const LoginPage: React.FC = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const userStr = localStorage.getItem('edunovas_user');
+        // Migration logic: prevent logging out existing users after rename
+        const oldUserStr = localStorage.getItem('edunovas_user');
+        const newUserStr = localStorage.getItem('eduzyniq_user');
+        if (oldUserStr && !newUserStr) {
+            localStorage.setItem('eduzyniq_user', oldUserStr);
+            localStorage.removeItem('edunovas_user');
+        }
+
+        const userStr = localStorage.getItem('eduzyniq_user');
         if (userStr) {
             try {
                 const user = JSON.parse(userStr);
@@ -31,7 +39,7 @@ export const LoginPage: React.FC = () => {
                     }, 1500);
                 }
             } catch (e) {
-                localStorage.removeItem('edunovas_user');
+                localStorage.removeItem('eduzyniq_user');
             }
         }
     }, [navigate]);
@@ -69,7 +77,7 @@ export const LoginPage: React.FC = () => {
             console.log("Response received:", data);
 
             if (response.ok) {
-                localStorage.setItem('edunovas_user', JSON.stringify({
+                localStorage.setItem('eduzyniq_user', JSON.stringify({
                     email: data.email,
                     role: data.role,
                     token: data.access_token,

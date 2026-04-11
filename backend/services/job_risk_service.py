@@ -3,7 +3,11 @@ import os
 from collections import Counter
 
 class JobRiskService:
-    def __init__(self, csv_path="/home/vinay/Desktop/Projects/Edunovas-main/backend/JOBS DATASET/fake_job_postings.csv"):
+    def __init__(self, csv_path=None):
+        if csv_path is None:
+            # Get the path to the dataset relative to this file
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            csv_path = os.path.join(base_dir, "JOBS DATASET", "fake_job_postings.csv")
         self.csv_path = csv_path
         self._df = None
         self._load_data()

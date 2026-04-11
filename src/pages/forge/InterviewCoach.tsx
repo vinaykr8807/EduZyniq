@@ -64,7 +64,7 @@ const DOMAINS = ['Full Stack Development', 'Generative AI & Machine Learning', '
 
 const saveInterviewSession = async (payload: object) => {
     try {
-        const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+        const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (!user?.email) return;
         await apiFetch(`${API_BASE_URL}/save-interview-session`, {
             method: 'POST',
@@ -187,7 +187,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setCurrentQuestion(null); setUserMockAnswer(''); setUserApproach(''); setUserCode('');
         setCodingPhase('approach'); setTestResults(null); setCodingEval(null); setConfirmSkip(false);
         try {
-            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
             const res = await apiFetch(`${API_BASE_URL}/coach/mock-interview/plan`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -213,7 +213,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setUserMockAnswer(''); setUserApproach(''); setUserCode('');
         setCodingPhase('approach'); setTestResults(null); setCodingEval(null);
         try {
-            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
             const res = await apiFetch(`${API_BASE_URL}/coach/mock-interview/question`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -353,7 +353,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
     const saveSession = async (evals: any[]) => {
         try {
-            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
             if (!user.email) return;
             await apiFetch(`${API_BASE_URL}/coach/mock-interview/save-session`, {
                 method: 'POST',
@@ -373,7 +373,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+        const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (!user.email) return;
 
         // Fetch both resume status and student profile (which contains domain)
@@ -393,7 +393,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setMarketLoading(true);
         setActiveTab('trends');
         try {
-            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
             const response = await apiFetch(`${API_BASE_URL}/teacher/market-skills`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -412,7 +412,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         setGuideLoading(true);
         setActiveTab('mentor');
         try {
-            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
             const response = await apiFetch(`${API_BASE_URL}/coach/beginner-guide`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -451,7 +451,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
         if (file) formData.append('file', file);
         formData.append('role', role);
         formData.append('level', level);
-        const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+        const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (user.email) formData.append('user_email', user.email);
 
         try {

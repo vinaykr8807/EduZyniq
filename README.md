@@ -1,10 +1,10 @@
-# Edunovas
+# EduZyniq
 
 AI-assisted learning and career development platform built with React (frontend), FastAPI (backend), and Supabase (data/storage).
 
 ## Overview
 
-Edunovas combines multiple learning modules in one interface:
+EduZyniq combines multiple learning modules in one interface:
 
 - Interview coaching with resume analysis and readiness scoring
 - Adaptive quiz generation and topic-level mastery tracking
@@ -121,8 +121,8 @@ Optional but recommended:
 ### 1) Clone and install frontend dependencies
 
 ```bash
-git clone https://github.com/vinaykr8807/Edunovas.git
-cd Edunovas
+git clone https://github.com/vinaykr8807/EduZyniq.git
+cd EduZyniq
 npm install
 ```
 
@@ -154,7 +154,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your_email
 SMTP_PASS=your_app_password
-FROM_EMAIL=notifications@edunovas.ai
+FROM_EMAIL=notifications@eduzyniq.ai
 GITHUB_TOKEN=optional_for_codex_reference_search
 ```
 

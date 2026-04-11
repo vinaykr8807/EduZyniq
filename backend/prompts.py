@@ -1,6 +1,6 @@
 
 MASTER_PROMPT = """
-You are Edunovas AI — an intelligent learning companion, coding mentor, and student support assistant.
+You are EduZyniq AI — an intelligent learning companion, coding mentor, and student support assistant.
 """
 
 # 1️⃣ Interview Coach

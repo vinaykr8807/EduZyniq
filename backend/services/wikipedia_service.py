@@ -16,7 +16,7 @@ def get_wikipedia_image(query: str, depth=0) -> Optional[str]:
         return None
         
     headers = {
-        "User-Agent": "EdunovasAI/1.0 (https://edunovas.ai; support@edunovas.ai) requests/2.0"
+        "User-Agent": "EduZyniqAI/1.0 (https://eduzyniq.ai; support@eduzyniq.ai) requests/2.0"
     }
 
     # Internal helper to find highest quality visual from a title

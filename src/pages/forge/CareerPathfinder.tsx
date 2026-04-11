@@ -76,7 +76,7 @@ export const CareerPathfinder = () => {
     const [subscribeMsg, setSubscribeMsg] = useState('');
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+        const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (!user.email) return;
         fetch(`http://127.0.0.1:8000/resume-status?user_email=${encodeURIComponent(user.email)}`)
             .then((r) => r.json())
@@ -95,7 +95,7 @@ export const CareerPathfinder = () => {
         formData.append('role', role);
         formData.append('level', level);
         formData.append('city', city);
-        const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+        const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (user.email) formData.append('user_email', user.email);
 
         try {
@@ -117,7 +117,7 @@ export const CareerPathfinder = () => {
     };
 
     const handleSubscribe = async () => {
-        const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+        const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (!user.email) {
             setSubscribeMsg('Please log in to subscribe.');
             return;

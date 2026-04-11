@@ -7,11 +7,11 @@ export const Navbar: React.FC = () => {
     const navigate = useNavigate();
     const { theme, cycleTheme, meta } = useTheme();
 
-    const userStr = localStorage.getItem('edunovas_user');
+    const userStr = localStorage.getItem('eduzyniq_user');
     let user = null;
     if (userStr) {
         try { user = JSON.parse(userStr); }
-        catch (e) { localStorage.removeItem('edunovas_user'); }
+        catch (e) { localStorage.removeItem('eduzyniq_user'); }
     }
 
     const navLinks = [
@@ -22,8 +22,8 @@ export const Navbar: React.FC = () => {
     if (user?.role === 'admin')   navLinks.push({ name: 'Dashboard', path: '/admin' });
 
     const handleLogout = () => {
-        localStorage.removeItem('edunovas_user');
-        localStorage.removeItem('edunovas_profile');
+        localStorage.removeItem('eduzyniq_user');
+        localStorage.removeItem('eduzyniq_profile');
         navigate('/login');
     };
 
@@ -58,7 +58,7 @@ export const Navbar: React.FC = () => {
                         fontSize: '1.15rem', fontWeight: 800,
                         color: 'var(--text-primary)',
                         letterSpacing: '-0.5px',
-                    }}>Edunovas</span>
+                    }}>EduZyniq</span>
                 </Link>
 
                 {/* Centered Links */}

@@ -142,7 +142,7 @@ const YouTubeEmbed = ({ url }: { url: string }) => {
     );
 };
 
-const getUser = () => JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+const getUser = () => JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
 
 const saveProgress = async (payload: object) => {
     try {

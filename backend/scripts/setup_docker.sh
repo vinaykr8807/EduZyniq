@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Edunovas Coding Mentor - Docker Sandbox Setup
+# EduZyniq Coding Mentor - Docker Sandbox Setup
 # This script pulls all necessary images for the multi-language sandbox.
 
-echo "🚀 Setting up Edunovas Coding Mentor Sandbox..."
+echo "🚀 Setting up EduZyniq Coding Mentor Sandbox..."
 
 IMAGES=(
     "python:3.11-slim"

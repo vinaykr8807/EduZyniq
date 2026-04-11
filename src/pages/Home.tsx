@@ -292,7 +292,7 @@ export const Home = () => {
 
             {/* 7. FOOTER */}
             <footer style={{ padding: '4rem 0', borderTop: '1px solid var(--glass-border)', textAlign: 'center' }}>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>© 2026 Edunovas. All rights reserved.</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>© 2026 EduZyniq. All rights reserved.</p>
             </footer>
         </div>
     );

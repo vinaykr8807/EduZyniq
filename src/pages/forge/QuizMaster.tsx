@@ -57,7 +57,7 @@ export const QuizMaster = ({ onComplete }: any) => {
             // but setting the mode ensures they see the targeted screen properly.
         }
 
-        const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+        const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (!user.email) return;
 
         apiFetch(`${API_BASE_URL}/student/profile?user_email=${encodeURIComponent(user.email)}`)
@@ -98,7 +98,7 @@ export const QuizMaster = ({ onComplete }: any) => {
             }
 
             let data;
-            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
 
             if (quizMode === 'targeted') {
                 // Fetch weak areas first if needed, or assume they are passed/calculated
@@ -155,7 +155,7 @@ export const QuizMaster = ({ onComplete }: any) => {
     const handleTeachSubmit = async () => {
         setIsAnalyzing(true);
         try {
-            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
             const res = await apiFetch(`${API_BASE_URL}/evaluate-explanation`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -259,7 +259,7 @@ export const QuizMaster = ({ onComplete }: any) => {
                 };
             });
 
-            const user = JSON.parse(localStorage.getItem('edunovas_user') || '{}');
+            const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
             try {
                 if (user.email) {
                     await apiFetch(`${API_BASE_URL}/submit-quiz`, {

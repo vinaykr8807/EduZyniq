@@ -10,7 +10,7 @@ import { useTheme } from './hooks/useTheme';
 
 // Simple Route Guard
 const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: string }) => {
-  const userStr = localStorage.getItem('edunovas_user');
+  const userStr = localStorage.getItem('eduzyniq_user');
   if (!userStr) return <Navigate to="/login" replace />;
 
   try {
@@ -19,7 +19,7 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: 
       return <Navigate to="/" replace />;
     }
   } catch (e) {
-    localStorage.removeItem('edunovas_user');
+    localStorage.removeItem('eduzyniq_user');
     return <Navigate to="/login" replace />;
   }
 
