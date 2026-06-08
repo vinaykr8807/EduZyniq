@@ -1,11 +1,13 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
+import { useResponsive } from '../hooks/useResponsive';
 
 export const Navbar: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { theme, cycleTheme, meta } = useTheme();
+    const { isMobile, isTablet } = useResponsive();
 
     const userStr = localStorage.getItem('eduzyniq_user');
     let user = null;
@@ -42,7 +44,21 @@ export const Navbar: React.FC = () => {
             padding: '0.75rem 0',
             transition: 'background 0.4s ease, border-color 0.4s ease',
         }}>
-            <div className="container flex items-center justify-between" style={{ padding: '0 3rem', paddingTop: 0, maxWidth: '100%' }}>
+            <div
+                className="container"
+                style={{
+                    padding: isMobile ? '0 1rem' : isTablet ? '0 1.5rem' : '0 3rem',
+                    maxWidth: '100%',
+                }}
+            >
+                <div
+                    className="flex items-center justify-between"
+                    style={{
+                        gap: '1rem',
+                        flexWrap: isMobile ? 'wrap' : 'nowrap',
+                        width: '100%',
+                    }}
+                >
 
                 {/* Logo */}
                 <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -62,7 +78,19 @@ export const Navbar: React.FC = () => {
                 </Link>
 
                 {/* Centered Links */}
-                <div className="flex items-center" style={{ gap: '2rem', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+                <div
+                    className="flex items-center"
+                    style={{
+                        gap: isTablet ? '1rem' : '2rem',
+                        position: isMobile ? 'static' : 'absolute',
+                        left: isMobile ? undefined : '50%',
+                        transform: isMobile ? undefined : 'translateX(-50%)',
+                        order: isMobile ? 3 : undefined,
+                        width: isMobile ? '100%' : 'auto',
+                        justifyContent: isMobile ? 'center' : 'flex-start',
+                        flexWrap: 'wrap',
+                    }}
+                >
                     {navLinks.map((link) => (
                         <Link
                             key={link.path}
@@ -83,7 +111,7 @@ export const Navbar: React.FC = () => {
                 </div>
 
                 {/* Right Actions */}
-                <div className="flex items-center" style={{ gap: '0.75rem' }}>
+                <div className="flex items-center" style={{ gap: '0.75rem', marginLeft: isMobile ? 'auto' : undefined }}>
                     {/* ─── Theme Cycle Button ─── */}
                     <button
                         onClick={cycleTheme}
@@ -125,6 +153,7 @@ export const Navbar: React.FC = () => {
                             </button>
                         </>
                     )}
+                </div>
                 </div>
             </div>
         </nav>

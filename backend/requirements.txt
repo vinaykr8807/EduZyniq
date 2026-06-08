@@ -1,10 +1,14 @@
-fastapi
+fastapi==0.110.1
+starlette>=0.37.2,<0.38.0
 uvicorn
-groq
+groq>=0.37.1,<1
+httpx>=0.28.1
 pydantic
 python-dotenv
 requests>=2.33.1
 python-multipart
+redis
+opencv-python-headless
 pytesseract
 pillow
 psycopg2-binary
@@ -12,10 +16,12 @@ sqlalchemy
 passlib[bcrypt]
 python-jose[cryptography]
 PyMuPDF
+pypdf
 pdf2image
 python-docx
 pdfplumber
 duckduckgo-search
+feedparser
 reportlab
 faiss-cpu
 numpy<2.0.0
@@ -25,3 +31,6 @@ playwright
 torch
 scikit-learn
 openai
+neo4j
+supabase
+langgraph

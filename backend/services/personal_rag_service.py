@@ -1,19 +1,37 @@
 import os
-import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from typing import List, Optional
 
-# Load model early
-try:
-    embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-except Exception as e:
-    print(f"Failed to load sentence transformer for Personal RAG: {e}")
-    embedding_model = None
+RAG_VECTOR_BACKEND = os.getenv("RAG_VECTOR_BACKEND", "numpy").lower()
+embedding_model = None
+
+
+def _get_faiss():
+    if RAG_VECTOR_BACKEND != "faiss":
+        return None
+    try:
+        import faiss
+        return faiss
+    except Exception as e:
+        print(f"FAISS backend requested but faiss-cpu is unavailable: {e}")
+        return None
+
+
+def _get_embedding_model():
+    global embedding_model
+    if embedding_model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception as e:
+            print(f"Failed to load sentence transformer for Personal RAG: {e}")
+            return None
+    return embedding_model
 
 def get_personal_context(user_email: str, query: str, supabase_client, top_k: int = 3) -> str:
     """Fetch user's past doubts and AI teacher explanations to provide context."""
-    if not embedding_model or not user_email:
+    model = _get_embedding_model()
+    if model is None or not user_email:
         return ""
 
     try:
@@ -39,20 +57,24 @@ def get_personal_context(user_email: str, query: str, supabase_client, top_k: in
             return ""
 
         # 4. Vectorize and Search
-        interaction_embeddings = embedding_model.encode(interactions)
-        dimension = interaction_embeddings.shape[1]
-        
-        index = faiss.IndexFlatL2(dimension)
-        index.add(np.array(interaction_embeddings).astype('float32'))
-        
-        query_embedding = embedding_model.encode([query])
-        distances, indices = index.search(np.array(query_embedding).astype('float32'), top_k)
+        interaction_embeddings = np.array(model.encode(interactions)).astype('float32')
+        query_embedding = np.array(model.encode([query])).astype('float32')
+
+        faiss = _get_faiss()
+        if faiss is not None:
+            index = faiss.IndexFlatL2(interaction_embeddings.shape[1])
+            index.add(interaction_embeddings)
+            _, search_indices = index.search(query_embedding, top_k)
+            indices = search_indices[0]
+        else:
+            distances = np.linalg.norm(interaction_embeddings - query_embedding[0], axis=1)
+            indices = np.argsort(distances)[:top_k]
         
         # 5. Build context string
         context_parts = []
-        for idx in indices[0]:
-            if idx != -1 and idx < len(interactions):
-                context_parts.append(interactions[idx])
+        for idx in indices:
+            if idx < len(interactions):
+                context_parts.append(interactions[int(idx)])
         
         if not context_parts:
             return ""

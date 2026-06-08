@@ -103,6 +103,7 @@ export const Assistant = () => {
             {showProfileDialog && (
                     <ProfileDialog
                         title={profile ? "Update Your Profile" : "AI Onboarding: Core Details"}
+                        initialProfile={profile}
                         onSave={handleProfileSave}
                         onClose={handleProfileClose}
                     />

@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export const Analytics = ({ stats, fetchStats }: any) => {
+    const { isMobile } = useResponsive();
 
     useEffect(() => {
         if (fetchStats) fetchStats();
@@ -17,7 +19,7 @@ export const Analytics = ({ stats, fetchStats }: any) => {
                 <p style={{ color: 'var(--text-secondary)' }}>Detailed metrics and growth trajectory</p>
             </header>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '2rem' }}>
                 {/* Domain Strength Radar Simulation */}
                 <div className="glass-card" style={{ padding: '2rem' }}>
                     <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '2rem' }}>DOMAIN STRENGTH RADAR</h3>

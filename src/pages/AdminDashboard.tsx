@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import jsPDF from 'jspdf';
 import { SkillGap3D } from '../components/SkillGap3D';
+import API_BASE_URL, { apiFetch } from '../config';
 
 interface Analytics {
     total_students: number;
@@ -7,9 +9,12 @@ interface Analytics {
     total_xp: number;
     total_interaction_hits: number;
     total_interviews: number;
+    total_live_interviews: number;
     total_optimizations: number;
     total_quizzes: number;
     avg_readiness_score: number;
+    avg_live_readiness_score: number;
+    avg_live_confidence_score: number;
     avg_optimization_score: number;
     domain_distribution: Record<string, number>;
     top_skills: { name: string; count: number }[];
@@ -30,6 +35,29 @@ interface StudentPerf {
     latest_readiness: number | null;
     avg_readiness: number | null;
     last_interview_role: string | null;
+    mock_room_sessions: number;
+    latest_mock_readiness: number | null;
+    avg_mock_readiness: number | null;
+    interview_readiness_trend: number[];
+    interview_history: { kind: string; score: number | null; date: string | null; role: string | null }[];
+    latest_mock_report: {
+        role?: string;
+        domain?: string;
+        level?: string;
+        generated_at?: string;
+        readiness_score?: number;
+        coaching_tips?: string[];
+        weak_areas?: string[];
+        presence_alerts?: string[];
+        strengths?: string[];
+        improvements?: string[];
+    };
+    latest_mock_metrics: {
+        confidence?: number | null;
+        eye_contact?: number | null;
+        posture?: number | null;
+        speech_clarity?: number | null;
+    };
     code_optimizations_done: number;
     avg_optimization_score: number | null;
     quizzes_completed: number;
@@ -52,11 +80,11 @@ export const AdminDashboard: React.FC = () => {
         const fetchAll = async () => {
             try {
                 const [analyticsRes, perfRes, marketRes, histRes, riskRes] = await Promise.all([
-                    fetch('http://127.0.0.1:8000/admin/analytics'),
-                    fetch('http://127.0.0.1:8000/admin/student-performance'),
-                    fetch('http://127.0.0.1:8000/admin/market-insights'),
-                    fetch('http://127.0.0.1:8000/admin/historical-market-overview'),
-                    fetch('http://127.0.0.1:8000/admin/risk-overview')
+                    apiFetch(`${API_BASE_URL}/admin/analytics`),
+                    apiFetch(`${API_BASE_URL}/admin/student-performance`),
+                    apiFetch(`${API_BASE_URL}/admin/market-insights`),
+                    apiFetch(`${API_BASE_URL}/admin/historical-market-overview`),
+                    apiFetch(`${API_BASE_URL}/admin/risk-overview`)
                 ]);
                 if (analyticsRes.ok) setData(await analyticsRes.json());
                 if (perfRes.ok) {
@@ -97,6 +125,123 @@ export const AdminDashboard: React.FC = () => {
         return 'var(--accent-red)';
     };
 
+    const formatShortDate = (date: string | null) => {
+        if (!date) return 'Unknown';
+        const parsed = new Date(date);
+        if (Number.isNaN(parsed.getTime())) return 'Unknown';
+        return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    };
+
+    const formatInterviewDate = (date: string | null) => {
+        if (!date) return 'Unknown date';
+        const parsed = new Date(date);
+        if (Number.isNaN(parsed.getTime())) return 'Unknown date';
+        return parsed.toLocaleString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+    };
+
+    const metricBar = (label: string, value: number | null | undefined) => {
+        const score = value == null ? null : Math.round(value);
+        const width = score == null ? 0 : Math.max(4, Math.min(score, 100));
+
+        return (
+            <div key={label}>
+                <div className="flex justify-between" style={{ marginBottom: '0.35rem' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{label}</span>
+                    <strong style={{ color: score == null ? 'var(--text-muted)' : readinessColor(score), fontSize: '0.9rem' }}>
+                        {score != null ? `${score}%` : '-'}
+                    </strong>
+                </div>
+                <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(148,163,184,0.16)', overflow: 'hidden' }}>
+                    <div style={{ width: `${width}%`, height: '100%', borderRadius: '999px', background: score == null ? 'rgba(148,163,184,0.35)' : readinessColor(score) }} />
+                </div>
+            </div>
+        );
+    };
+
+    const hasInterviewScore = (score: number | null | undefined): score is number =>
+        typeof score === 'number' && score > 0;
+
+    const interviewScoreLabel = (score: number | null | undefined) =>
+        hasInterviewScore(score) ? `${Math.round(score)}%` : 'No score';
+
+    const interviewScoreColor = (score: number | null | undefined) =>
+        hasInterviewScore(score) ? readinessColor(score ?? null) : 'var(--text-muted)';
+
+    const reportList = (items: string[] | undefined, emptyText: string, limit = 3) => {
+        const list = (items || []).filter(Boolean).slice(0, limit);
+
+        if (!list.length) {
+            return <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{emptyText}</span>;
+        }
+
+        return list.map(item => (
+            <span key={item} style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45, padding: '0.45rem 0', borderTop: '1px solid rgba(148,163,184,0.08)' }}>
+                {item}
+            </span>
+        ));
+    };
+
+    const exportStudentInterviewPdf = (student: StudentPerf) => {
+        const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+        let y = 48;
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const addLine = (text: string, size = 11, color: [number, number, number] = [51, 65, 85]) => {
+            if (y > pageHeight - 48) {
+                pdf.addPage();
+                y = 48;
+            }
+            pdf.setFontSize(size);
+            pdf.setTextColor(color[0], color[1], color[2]);
+            const lines = pdf.splitTextToSize(text, 500);
+            pdf.text(lines, 48, y);
+            y += lines.length * (size + 3);
+        };
+
+        pdf.setFontSize(20);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text('Student Interview Progress Report', 48, y);
+        y += 28;
+
+        addLine(`Student: ${student.full_name || student.email}`, 12, [15, 23, 42]);
+        addLine(`Email: ${student.email}`, 11);
+        addLine(`Latest readiness: ${student.latest_readiness != null ? `${student.latest_readiness}%` : 'N/A'} | Avg readiness: ${student.avg_readiness != null ? `${student.avg_readiness}%` : 'N/A'}`, 11);
+        addLine(`Live room sessions: ${student.mock_room_sessions} | Interview sessions total: ${student.interview_sessions}`, 11);
+        addLine(`Latest metrics: confidence ${student.latest_mock_metrics.confidence != null ? `${Math.round(student.latest_mock_metrics.confidence)}%` : 'N/A'}, eye contact ${student.latest_mock_metrics.eye_contact != null ? `${Math.round(student.latest_mock_metrics.eye_contact)}%` : 'N/A'}, posture ${student.latest_mock_metrics.posture != null ? `${Math.round(student.latest_mock_metrics.posture)}%` : 'N/A'}, speech clarity ${student.latest_mock_metrics.speech_clarity != null ? `${Math.round(student.latest_mock_metrics.speech_clarity)}%` : 'N/A'}`, 11);
+
+        y += 10;
+        addLine('Recent interview history', 13, [30, 64, 175]);
+        if (student.interview_history.length) {
+            student.interview_history.slice(-12).forEach(item => {
+                const date = item.date ? new Date(item.date).toLocaleString() : 'Unknown date';
+                addLine(`• ${date} | ${item.kind} | ${item.role || 'Interview'} | ${item.score != null ? `${Math.round(item.score)}%` : 'N/A'}`, 10);
+            });
+        } else {
+            addLine('• No interview history available yet.', 10);
+        }
+
+        y += 10;
+        addLine('Coaching tips', 13, [30, 64, 175]);
+        ((student.latest_mock_report.coaching_tips || []).slice(0, 6)).forEach(tip => addLine(`• ${tip}`, 10));
+        if (!(student.latest_mock_report.coaching_tips || []).length) addLine('• No coaching tips available yet.', 10);
+
+        y += 10;
+        addLine('Weak areas', 13, [220, 38, 38]);
+        ((student.latest_mock_report.weak_areas || []).slice(0, 8)).forEach(area => addLine(`• ${area}`, 10));
+        if (!(student.latest_mock_report.weak_areas || []).length) addLine('• No weak areas recorded.', 10);
+
+        y += 10;
+        addLine('Presence alerts', 13, [217, 119, 6]);
+        ((student.latest_mock_report.presence_alerts || []).slice(0, 8)).forEach(alert => addLine(`• ${alert}`, 10));
+        if (!(student.latest_mock_report.presence_alerts || []).length) addLine('• No presence issues recorded.', 10);
+
+        pdf.save(`${(student.full_name || student.email || 'student').replace(/\s+/g, '_')}_Interview_Report.pdf`);
+    };
+
     return (
         <div className="container fade-in" style={{ maxWidth: '1600px', paddingBottom: '5rem' }}>
             {/* Header */}
@@ -126,6 +271,7 @@ export const AdminDashboard: React.FC = () => {
                     { label: 'TOTAL XP EARNED', value: data?.total_xp?.toLocaleString() ?? 0, icon: '⚡', color: 'var(--accent-orange)' },
                     { label: 'TOPICS COMPLETED', value: data?.total_interaction_hits ?? 0, icon: '✅', color: 'var(--accent-green)' },
                     { label: 'INTERVIEW SESSIONS', value: data?.total_interviews ?? 0, icon: '🎤', color: 'var(--primary-500)' },
+                    { label: 'LIVE ROOMS', value: data?.total_live_interviews ?? 0, icon: '📹', color: '#38bdf8' },
                     { label: 'CODING SESSIONS', value: data?.total_optimizations ?? 0, icon: '💻', color: '#c084fc' },
                     { label: 'QUIZZES COMPLETED', value: data?.total_quizzes ?? 0, icon: '📝', color: 'var(--accent-orange)' },
                 ].map(stat => (
@@ -228,6 +374,20 @@ export const AdminDashboard: React.FC = () => {
                                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>Avg Readiness</p>
                             </div>
                         </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                            <div style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(56,189,248,0.05)' }}>
+                                <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800 }}>LIVE ROOM READINESS</p>
+                                <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#38bdf8', marginTop: '0.25rem' }}>
+                                    {data?.avg_live_readiness_score ? `${data.avg_live_readiness_score}%` : '—'}
+                                </p>
+                            </div>
+                            <div style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(168,85,247,0.05)' }}>
+                                <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800 }}>AVG CONFIDENCE</p>
+                                <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#c084fc', marginTop: '0.25rem' }}>
+                                    {data?.avg_live_confidence_score ? `${data.avg_live_confidence_score}%` : '—'}
+                                </p>
+                            </div>
+                        </div>
                         <div style={{ marginTop: '1.25rem', height: '8px', background: 'rgba(52,160,90,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${data?.avg_readiness_score ?? 0}%`, background: `linear-gradient(90deg, ${(data?.avg_readiness_score ?? 0) >= 70 ? 'var(--accent-green)' : (data?.avg_readiness_score ?? 0) >= 40 ? 'var(--accent-orange)' : 'var(--accent-red)'}, var(--accent-blue))`, transition: 'width 1s ease' }} />
                         </div>
@@ -265,11 +425,11 @@ export const AdminDashboard: React.FC = () => {
                         <SkillGap3D 
                             labels={['Algorithmic', 'Conceptual', 'Interviewing', 'System Design', 'Real-world Fit']}
                             current={{
-                                'Algorithmic': data?.avg_optimization_score ?? 35,
-                                'Conceptual': (data?.total_interaction_hits ?? 0) > 100 ? 80 : 45,
-                                'Interviewing': data?.avg_readiness_score ?? 30,
-                                'System Design': 40,
-                                'Real-world Fit': (data?.total_interviews ?? 0) > 10 ? 60 : 25
+                                'Algorithmic': data?.avg_optimization_score ?? 0,
+                                'Conceptual': 0,
+                                'Interviewing': data?.avg_readiness_score ?? 0,
+                                'System Design': 0,
+                                'Real-world Fit': 0
                             }}
                             dream={{
                                 'Algorithmic': 90,
@@ -486,8 +646,8 @@ export const AdminDashboard: React.FC = () => {
                                                     <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>INTERVIEWS</p>
                                                 </div>
                                                 <div style={{ textAlign: 'center' }}>
-                                                    <p style={{ fontWeight: 900, fontSize: '1.4rem', color: '#c084fc', lineHeight: 1 }}>{student.code_optimizations_done}</p>
-                                                    <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>CODING</p>
+                                                    <p style={{ fontWeight: 900, fontSize: '1.4rem', color: '#c084fc', lineHeight: 1 }}>{student.avg_optimization_score != null ? `${student.avg_optimization_score}%` : '-'}</p>
+                                                    <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.3px' }}>CODE SCORE</p>
                                                 </div>
                                                 <div style={{ textAlign: 'center' }}>
                                                     <p style={{ fontWeight: 900, fontSize: '1.4rem', color: 'var(--accent-green)', lineHeight: 1 }}>{student.xp}</p>
@@ -502,6 +662,15 @@ export const AdminDashboard: React.FC = () => {
                                         {isExpanded && (
                                             <div className="flex-col gap-lg fade-in" style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--glass-border)' }}>
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                                                    <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+                                                        <button
+                                                            className="btn btn-primary"
+                                                            onClick={() => exportStudentInterviewPdf(student)}
+                                                            style={{ fontSize: '0.78rem', padding: '0.55rem 1rem' }}
+                                                        >
+                                                            Export Interview PDF
+                                                        </button>
+                                                    </div>
                                                     {/* Teacher Progress */}
                                                     <div style={{ padding: '1rem', background: 'rgba(52,160,90,0.04)', borderRadius: '12px', border: '1px solid rgba(52,160,90,0.12)' }}>
                                                         <p style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary-600)', marginBottom: '0.75rem', textTransform: 'uppercase' }}>🎓 AI Teacher Progress</p>
@@ -538,6 +707,10 @@ export const AdminDashboard: React.FC = () => {
                                                                 <strong style={{ color: 'var(--text-primary)' }}>{student.interview_sessions}</strong>
                                                             </div>
                                                             <div className="flex justify-between">
+                                                                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Live Rooms</span>
+                                                                <strong style={{ color: '#38bdf8' }}>{student.mock_room_sessions}</strong>
+                                                            </div>
+                                                            <div className="flex justify-between">
                                                                 <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Latest Score</span>
                                                                 <strong style={{ color: readinessColor(student.latest_readiness) }}>
                                                                     {student.latest_readiness != null ? `${student.latest_readiness}%` : '—'}
@@ -554,6 +727,11 @@ export const AdminDashboard: React.FC = () => {
                                                                     Target: <em>{student.last_interview_role}</em>
                                                                 </p>
                                                             )}
+                                                            {student.latest_mock_readiness != null && (
+                                                                <p style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '6px' }}>
+                                                                    Latest room readiness: <strong>{student.latest_mock_readiness}%</strong>
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -562,11 +740,11 @@ export const AdminDashboard: React.FC = () => {
                                                         <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#c084fc', marginBottom: '0.75rem', textTransform: 'uppercase' }}>💻 Coding Mentor</p>
                                                         <div className="flex-col gap-xs">
                                                             <div className="flex justify-between">
-                                                                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>AI Optimizations</span>
+                                                                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Saved Runs</span>
                                                                 <strong style={{ color: 'var(--text-primary)' }}>{student.code_optimizations_done}</strong>
                                                             </div>
                                                             <div className="flex justify-between">
-                                                                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Avg Improve Score</span>
+                                                                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Dashboard Score</span>
                                                                 <strong style={{ color: student.avg_optimization_score! >= 70 ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
                                                                     {student.avg_optimization_score != null ? `${student.avg_optimization_score}%` : '—'}
                                                                 </strong>
@@ -585,6 +763,90 @@ export const AdminDashboard: React.FC = () => {
                                                             </div>
                                                         </div>
                                                     )}
+                                                    {student.mock_room_sessions > 0 && (
+                                                        <div style={{ padding: '1rem', background: 'rgba(56,189,248,0.04)', borderRadius: '12px', border: '1px solid rgba(56,189,248,0.12)' }}>
+                                                            <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.75rem', textTransform: 'uppercase' }}>Live Interview Readiness</p>
+                                                            <div className="flex-col gap-md">
+                                                                {metricBar('Confidence', student.latest_mock_metrics.confidence)}
+                                                                {metricBar('Eye Contact', student.latest_mock_metrics.eye_contact)}
+                                                                {metricBar('Posture', student.latest_mock_metrics.posture)}
+                                                                {metricBar('Speech Clarity', student.latest_mock_metrics.speech_clarity)}
+                                                                {student.interview_readiness_trend.length > 0 && (
+                                                                    <div style={{ marginTop: '0.5rem' }}>
+                                                                        <div className="flex justify-between" style={{ marginBottom: '0.45rem' }}>
+                                                                            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Recent readiness trend</p>
+                                                                            <span style={{ fontSize: '0.72rem', color: readinessColor(student.latest_mock_readiness) }}>
+                                                                                {student.latest_mock_readiness != null ? `${Math.round(student.latest_mock_readiness)}% latest` : ''}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '64px', padding: '0.25rem 0.1rem 0' }}>
+                                                                            {student.interview_readiness_trend.map((score, index) => {
+                                                                                const hasScore = hasInterviewScore(score);
+                                                                                return (
+                                                                                <div key={`${score}-${index}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+                                                                                    <div title={interviewScoreLabel(score)} style={{ width: '100%', maxWidth: '34px', height: hasScore ? `${Math.max(score, 8)}%` : '7px', minHeight: '7px', borderRadius: '6px 6px 2px 2px', background: hasScore ? readinessColor(score) : 'rgba(148,163,184,0.28)' }} />
+                                                                                    <span style={{ fontSize: '0.65rem', color: hasScore ? readinessColor(score) : 'var(--text-muted)' }}>{hasScore ? `${Math.round(score)}%` : '-'}</span>
+                                                                                </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {student.interview_history.length > 0 && (
+                                                        <div style={{ padding: '1rem', background: 'rgba(14,165,233,0.04)', borderRadius: '12px', border: '1px solid rgba(14,165,233,0.12)', gridColumn: 'span 2' }}>
+                                                            <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0ea5e9', marginBottom: '0.75rem', textTransform: 'uppercase' }}>Full Interview History</p>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '92px', marginBottom: '1rem', padding: '0 0.1rem' }}>
+                                                                {student.interview_history.slice(0, 8).reverse().map((entry, index) => {
+                                                                    const score = entry.score || 0;
+                                                                    const hasScore = hasInterviewScore(entry.score);
+                                                                    return (
+                                                                        <div key={`${entry.date}-${index}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                                                            <div title={`${entry.kind === 'live_room' ? 'Live Room' : 'Classic'} - ${interviewScoreLabel(entry.score)}`} style={{ width: '100%', maxWidth: '34px', height: hasScore ? `${Math.max(score, 8)}%` : '8px', minHeight: '8px', borderRadius: '6px 6px 2px 2px', background: hasScore ? (entry.kind === 'live_room' ? '#38bdf8' : '#10b981') : 'rgba(148,163,184,0.28)' }} />
+                                                                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatShortDate(entry.date)}</span>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                            <div className="flex-col gap-xs" style={{ maxHeight: '190px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                                                                {student.interview_history.slice(0, 6).map((entry, index) => (
+                                                                    <div key={`${entry.kind}-${entry.date}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(95px, 0.8fr) minmax(72px, 0.6fr) minmax(120px, 1fr) auto', gap: '0.75rem', alignItems: 'center', padding: '0.55rem 0', borderTop: index === 0 ? '1px solid rgba(148,163,184,0.14)' : '1px solid rgba(148,163,184,0.08)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                                                        <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{formatInterviewDate(entry.date)}</span>
+                                                                        <span>{entry.kind === 'live_room' ? 'Live Room' : 'Classic'}</span>
+                                                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.role || 'Interview'}</span>
+                                                                        <strong style={{ color: interviewScoreColor(entry.score), fontSize: '0.82rem', textAlign: 'right', whiteSpace: 'nowrap' }}>{interviewScoreLabel(entry.score)}</strong>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {((student.latest_mock_report?.coaching_tips?.length || 0) > 0 || (student.latest_mock_report?.weak_areas?.length || 0) > 0 || (student.latest_mock_report?.presence_alerts?.length || 0) > 0) && (
+                                                        <div style={{ padding: '1rem', background: 'rgba(99,102,241,0.04)', borderRadius: '12px', border: '1px solid rgba(99,102,241,0.12)', gridColumn: 'span 3' }}>
+                                                            <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#818cf8', marginBottom: '0.75rem', textTransform: 'uppercase' }}>Latest Interview Report Snapshot</p>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(150px, 1fr))', gap: '1rem', maxHeight: '210px', overflowY: 'auto', paddingRight: '0.25rem' }} className="admin-report-grid">
+                                                                <div>
+                                                                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Top Coaching Tips</p>
+                                                                    <div className="flex-col gap-xs">
+                                                                        {reportList(student.latest_mock_report.coaching_tips, 'No tips yet')}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Weak Areas</p>
+                                                                    <div className="flex-col gap-xs">
+                                                                        {reportList(student.latest_mock_report.weak_areas, 'No weak areas recorded')}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Presence Events</p>
+                                                                    <div className="flex-col gap-xs">
+                                                                        {reportList(student.latest_mock_report.presence_alerts, 'No issues recorded', 4)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     {/* Skill Gap 3D Visualization */}
                                                     <div className="flex-col gap-sm" style={{ 
                                                         padding: '1.50rem', 
@@ -599,11 +861,11 @@ export const AdminDashboard: React.FC = () => {
                                                         <SkillGap3D 
                                                             labels={['Technical', 'Knowledge', 'Readiness', 'Optimization', 'Market Fit']}
                                                             current={{
-                                                                'Technical': student.avg_optimization_score || 40,
-                                                                'Knowledge': student.avg_quiz_score || 50,
-                                                                'Readiness': student.avg_readiness || 30,
-                                                                'Optimization': (student.code_optimizations_done / 3) * 10 || 20,
-                                                                'Market Fit': student.domains_studied.length * 20 || 10
+                                                                'Technical': student.avg_optimization_score ?? 0,
+                                                                'Knowledge': student.avg_quiz_score ?? 0,
+                                                                'Readiness': student.avg_readiness ?? 0,
+                                                                'Optimization': student.avg_optimization_score ?? 0,
+                                                                'Market Fit': 0
                                                             }}
                                                             dream={{
                                                                 'Technical': 85,

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useEduZyniq } from '../hooks/useEduZyniq';
+import { useResponsive } from '../hooks/useResponsive';
 import { CURRICULUM_DATA, type Roadmap } from '../data/curriculumData';
+import API_BASE_URL, { apiFetch } from '../config';
 
 export const CurriculumPage = () => {
     const { profile } = useEduZyniq();
+    const { isMobile, isTablet } = useResponsive();
     const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap>(CURRICULUM_DATA[0]);
 
     useEffect(() => {
@@ -15,7 +18,7 @@ export const CurriculumPage = () => {
 
     const handleDownloadPDF = async () => {
         try {
-            const response = await fetch('http://127.0.0.1:8000/download-roadmap-pdf', {
+            const response = await apiFetch(`${API_BASE_URL}/download-roadmap-pdf`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(selectedRoadmap)
@@ -42,8 +45,8 @@ export const CurriculumPage = () => {
                 className="container"
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: '300px 1fr',
-                    gap: '2.5rem',
+                    gridTemplateColumns: isMobile ? '1fr' : isTablet ? '280px 1fr' : '300px 1fr',
+                    gap: isMobile ? '1.5rem' : '2.5rem',
                     alignItems: 'start',
                     maxWidth: '1440px'
                 }}
@@ -105,24 +108,24 @@ export const CurriculumPage = () => {
                 <div className="flex-col gap-xl">
                     {/* Roadmap Header Card */}
                     <div style={{
-                        padding: '3rem', borderRadius: '32px',
+                        padding: isMobile ? '1.5rem' : isTablet ? '2rem' : '3rem', borderRadius: '32px',
                         boxShadow: 'var(--shadow-lg)',
                         background: 'var(--glass-bg)',
                         backdropFilter: 'blur(20px)',
                         border: '1px solid var(--glass-border)',
                         position: 'relative'
                     }}>
-                        <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-xl" style={{ flex: 1 }}>
+                        <div className="flex justify-between items-start" style={{ gap: '1rem', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                            <div className="flex items-center gap-xl" style={{ flex: 1, minWidth: 0, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                                 <div style={{
-                                    width: '80px', height: '80px', borderRadius: '20px', background: 'var(--bg-tertiary)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem',
+                                    width: isMobile ? '64px' : '80px', height: isMobile ? '64px' : '80px', borderRadius: '20px', background: 'var(--bg-tertiary)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? '2rem' : '2.5rem',
                                     border: '1px solid var(--glass-border)'
                                 }}>
                                     {selectedRoadmap.icon}
                                 </div>
                                 <div className="flex-col gap-sm">
-                                    <h2 style={{ fontSize: '2.4rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-1.5px', margin: 0 }}>
+                                    <h2 style={{ fontSize: isMobile ? '1.7rem' : isTablet ? '2rem' : '2.4rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-1.5px', margin: 0 }}>
                                         {selectedRoadmap.title}
                                     </h2>
                                     <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: 0 }}>
@@ -130,7 +133,7 @@ export const CurriculumPage = () => {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex-col items-end gap-md">
+                            <div className="flex-col gap-md" style={{ alignItems: isMobile ? 'stretch' : 'flex-end', width: isMobile ? '100%' : 'auto' }}>
                                 <div className="flex gap-sm">
                                     <span style={{
                                         background: 'var(--bg-tertiary)', color: 'var(--primary-400)', padding: '0.5rem 1rem',
@@ -147,6 +150,7 @@ export const CurriculumPage = () => {
                                     </span>
                                 </div>
                                 <button onClick={handleDownloadPDF} className="btn btn-secondary" style={{
+                                    width: isMobile ? '100%' : 'auto',
                                     padding: '0.6rem 1.25rem', fontSize: '0.85rem', borderRadius: '12px', fontWeight: 700
                                 }}>
                                     📥 PDF
@@ -177,7 +181,7 @@ export const CurriculumPage = () => {
                                     <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>{phase.name}</h3>
                                 </div>
 
-                                <div className="grid-2 gap-lg" style={{ paddingLeft: '4.5rem' }}>
+                                <div className="grid-2 gap-lg" style={{ paddingLeft: isMobile ? '0' : '4.5rem' }}>
                                     {phase.milestones.map((m) => (
                                         <div key={m.title} className="glass-card" style={{
                                             padding: '2rem', borderRadius: '24px',

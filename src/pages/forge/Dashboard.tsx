@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CURRICULUM_DATA } from '../../data/curriculumData';
+import { useResponsive } from '../../hooks/useResponsive';
 
 const moduleList1 = [
     { id: 'INTERVIEWER',   name: 'Interview Coach',  desc: 'Ace every interview',    icon: '🎤' },
@@ -13,9 +14,10 @@ const moduleList2 = [
 
 export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any) => {
     const [expandedRoadmap, setExpandedRoadmap] = useState<string | null>('cloud');
+    const { isMobile, isTablet } = useResponsive();
+    const isCompact = isMobile || isTablet;
 
     const statAccent = ['var(--accent-blue)', 'var(--secondary-500)', 'var(--accent-green)'];
-
     return (
         <div className="flex-col gap-2xl fade-in" style={{ padding: '0 0 4rem', color: 'var(--text-primary)', transition: 'color 0.4s ease' }}>
 
@@ -26,7 +28,7 @@ export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any
                     Forge <span style={{ color: 'var(--primary-400)' }}>Launchpad</span>
                 </h1>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                    {profile?.domain || 'Full-stack Developer'}
+                    {profile?.domain || 'Set your domain'}
                 </p>
                 <div className="flex gap-sm">
                     <span style={{
@@ -42,11 +44,11 @@ export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '2.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '1fr 320px', gap: '2.5rem' }}>
                 <div className="flex-col gap-2xl">
 
                     {/* 2. Stats Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '1.25rem' }}>
                         {[
                             { label: 'Quiz Accuracy',       val: stats?.quiz_accuracy  || 0, icon: '🎯', color: statAccent[0] },
                             { label: 'Interview Readiness', val: stats?.interview_score || 0, icon: '👔', color: statAccent[1] },
@@ -82,7 +84,7 @@ export const ForgeDashboard = ({ profile, progress, stats, onSelectModule }: any
                     <div className="flex-col gap-lg">
                         <h3 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Modules</h3>
                         {[moduleList1, moduleList2].map((row, ri) => (
-                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.1rem' }}>
+                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '1.1rem' }}>
                                 {row.map(m => (
                                     <div
                                         key={m.id}

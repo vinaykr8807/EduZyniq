@@ -1,11 +1,20 @@
 import os
+import secrets
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # JWT configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "eduzyniq_ultra_secure_secret_777_!!!")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    if os.getenv("ENVIRONMENT", "development").lower() == "production":
+        raise RuntimeError("JWT_SECRET_KEY is required. Set it in backend/.env.")
+    SECRET_KEY = secrets.token_urlsafe(48)
+    print("WARNING: JWT_SECRET_KEY is missing. Using a temporary development secret for this process.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 hours
 
@@ -26,9 +35,9 @@ def verify_password(plain_password, hashed_password):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type WheelEvent as ReactWheelEvent } from 'react';
 import API_BASE_URL, { apiFetch } from '../../config';
 import { CURRICULUM_DATA, type Roadmap } from '../../data/curriculumData';
 import { playNotificationSound } from '../../utils/audio';
@@ -40,6 +40,104 @@ const normalizeLatexText = (text: string) => {
         .replace(/(^|[^\\])rightarrow\b/g, '$1\\rightarrow')
         .replace(/(^|[^\\])left\b/g, '$1\\left')
         .replace(/(^|[^\\])right\b/g, '$1\\right');
+};
+
+const isTrustedReferenceImageUrl = (url: string) => /(?:wikimedia|wikipedia)\.org/i.test(url);
+
+const getResponseErrorMessage = async (response: Response) => {
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+        try {
+            const data = await response.json();
+            if (typeof data?.detail === 'string' && data.detail.trim()) {
+                return data.detail;
+            }
+        } catch {
+            // Fall back to plain text below.
+        }
+    }
+
+    const text = await response.text();
+    return text || response.statusText || 'Request failed';
+};
+
+const looksLikeD2Line = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+
+    return (
+        /^direction\s*:/i.test(trimmed) ||
+        /^vars\s*:/i.test(trimmed) ||
+        /^[A-Za-z0-9_"(). -]+\s*(->|<-|<->)\s*[A-Za-z0-9_"(). -]+(?:\s*:\s*".*")?$/.test(trimmed) ||
+        /^[A-Za-z0-9_-]+\s*:\s*\{$/.test(trimmed) ||
+        /^[{}]$/.test(trimmed) ||
+        /^layout-engine\s*:/i.test(trimmed) ||
+        /^d2-config\s*:/i.test(trimmed)
+    );
+};
+
+const cleanD2NodeLabel = (value: string) => value.trim().replace(/^["']|["']$/g, '').trim() || 'Node';
+
+const parseD2FlowGraph = (code: string): FlowGraphPayload => {
+    const nodes: FlowGraphNode[] = [];
+    const edges: FlowGraphEdge[] = [];
+    const nodeIds = new Map<string, string>();
+    let direction = 'right';
+
+    const getNodeId = (label: string) => {
+        if (!nodeIds.has(label)) {
+            const id = `n${nodeIds.size + 1}`;
+            nodeIds.set(label, id);
+            nodes.push({ id, label });
+        }
+        return nodeIds.get(label)!;
+    };
+
+    for (const rawLine of code.split('\n')) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#')) continue;
+        if (line === '{' || line === '}') continue;
+        if (/^direction\s*:/i.test(line)) {
+            direction = line.split(':').slice(1).join(':').trim().toLowerCase() || 'right';
+            continue;
+        }
+        if (/^(vars|d2-config|layout-engine)\s*:/i.test(line)) continue;
+        if (!line.includes('->') && !line.includes('<-')) continue;
+
+        const match = line.match(/^(.*?)\s*(<->|->|<-)\s*(.*?)(?:\s*:\s*"([^"]*)")?\s*$/);
+        if (!match) continue;
+
+        let sourceLabel = cleanD2NodeLabel(match[1]);
+        let targetLabel = cleanD2NodeLabel(match[3]);
+        let kind = match[2];
+        const label = (match[4] || '').trim();
+
+        if (kind === '<-') {
+            [sourceLabel, targetLabel] = [targetLabel, sourceLabel];
+            kind = '->';
+        }
+
+        const source = getNodeId(sourceLabel);
+        const target = getNodeId(targetLabel);
+
+        edges.push({
+            id: `e${edges.length + 1}`,
+            source,
+            target,
+            label,
+            kind,
+            order: edges.length,
+        });
+    }
+
+    return {
+        title: 'AI Teacher Flow Graph',
+        direction,
+        provider: 'local',
+        nodes,
+        edges,
+    };
 };
 
 const YouTubeEmbed = ({ url }: { url: string }) => {
@@ -156,41 +254,357 @@ const saveProgress = async (payload: object) => {
     } catch { /* silent fail — progress saved locally via status state */ }
 };
 
+interface FlowGraphNode {
+    id: string;
+    label: string;
+}
+
+interface FlowGraphEdge {
+    id: string;
+    source: string;
+    target: string;
+    label?: string;
+    kind?: string;
+    order?: number;
+}
+
+interface FlowGraphPayload {
+    graph_id?: string;
+    title?: string;
+    direction?: string;
+    provider?: string;
+    nodes: FlowGraphNode[];
+    edges: FlowGraphEdge[];
+}
+
+const wrapFlowNodeLabel = (label: string, maxCharsPerLine: number = 15) => {
+    const words = label
+        .split(/\s+/)
+        .filter(Boolean)
+        .flatMap((word) => {
+            if (word.length <= maxCharsPerLine) return [word];
+
+            const chunks: string[] = [];
+            for (let index = 0; index < word.length; index += maxCharsPerLine) {
+                chunks.push(word.slice(index, index + maxCharsPerLine));
+            }
+            return chunks;
+        });
+    const lines: string[] = [];
+    let current = '';
+
+    for (const word of words) {
+        const next = current ? `${current} ${word}` : word;
+        if (next.length <= maxCharsPerLine || !current) {
+            current = next;
+        } else {
+            lines.push(current);
+            current = word;
+        }
+    }
+
+    if (current) lines.push(current);
+    return lines.slice(0, 3);
+};
+
+const getFlowEdgeLabelMetrics = (label: string) => {
+    const normalized = label.trim();
+    const display = normalized.length > 22 ? `${normalized.slice(0, 21)}…` : normalized;
+    const width = Math.max(112, Math.min(196, display.length * 7.1 + 28));
+
+    return { display, width };
+};
+
+const getFlowNodeRole = (nodeId: string, graph: FlowGraphPayload) => {
+    let incomingCount = 0;
+    let outgoingCount = 0;
+
+    graph.edges.forEach((edge) => {
+        if (edge.target === nodeId) incomingCount += 1;
+        if (edge.source === nodeId) outgoingCount += 1;
+    });
+
+    if (incomingCount === 0 && outgoingCount > 0) return 'Start';
+    if (outgoingCount === 0 && incomingCount > 0) return 'Outcome';
+    if (outgoingCount > 1) return 'Decision';
+    if (incomingCount > 1) return 'Merge';
+    return 'Step';
+};
+
+const getFlowGraphLayout = (graph: FlowGraphPayload) => {
+    const incoming = new Map<string, number>();
+    const outgoing = new Map<string, string[]>();
+    const levels = new Map<string, number>();
+
+    graph.nodes.forEach((node) => {
+        incoming.set(node.id, 0);
+        outgoing.set(node.id, []);
+    });
+
+    graph.edges.forEach((edge) => {
+        incoming.set(edge.target, (incoming.get(edge.target) || 0) + 1);
+        outgoing.set(edge.source, [...(outgoing.get(edge.source) || []), edge.target]);
+    });
+
+    const queue = graph.nodes
+        .filter((node) => (incoming.get(node.id) || 0) === 0)
+        .map((node) => node.id);
+
+    queue.forEach((id) => levels.set(id, 0));
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        const currentLevel = levels.get(current) || 0;
+        for (const target of outgoing.get(current) || []) {
+            incoming.set(target, Math.max(0, (incoming.get(target) || 0) - 1));
+            levels.set(target, Math.max(levels.get(target) || 0, currentLevel + 1));
+            if ((incoming.get(target) || 0) === 0) {
+                queue.push(target);
+            }
+        }
+    }
+
+    graph.nodes.forEach((node, index) => {
+        if (!levels.has(node.id)) {
+            levels.set(node.id, index);
+        }
+    });
+
+    const columns = new Map<number, FlowGraphNode[]>();
+    graph.nodes.forEach((node) => {
+        const level = levels.get(node.id) || 0;
+        columns.set(level, [...(columns.get(level) || []), node]);
+    });
+
+    const orderedLevels = [...columns.keys()].sort((a, b) => a - b);
+    const nodeWidth = 240;
+    const nodeHeight = 102;
+    const columnGap = 148;
+    const rowGap = 56;
+    const paddingX = 60;
+    const paddingY = 54;
+    const positions = new Map<string, { x: number; y: number }>();
+
+    orderedLevels.forEach((level) => {
+        const columnNodes = columns.get(level) || [];
+        const startY = paddingY;
+
+        columnNodes.forEach((node, index) => {
+            positions.set(node.id, {
+                x: paddingX + level * (nodeWidth + columnGap),
+                y: startY + index * (nodeHeight + rowGap),
+            });
+        });
+    });
+
+    const maxLevel = orderedLevels.length > 0 ? Math.max(...orderedLevels) : 0;
+    const maxColumnNodes = Math.max(...[...columns.values()].map((items) => items.length), 1);
+
+    return {
+        positions,
+        nodeWidth,
+        nodeHeight,
+        width: paddingX * 2 + (maxLevel + 1) * nodeWidth + maxLevel * columnGap,
+        height: Math.max(320, paddingY * 2 + maxColumnNodes * nodeHeight + Math.max(0, maxColumnNodes - 1) * rowGap),
+    };
+};
+
+const FlowGraphCanvas = ({ graph }: { graph: FlowGraphPayload }) => {
+    const layout = getFlowGraphLayout(graph);
+    const arrowId = `flow-arrow-${graph.graph_id || 'graph'}`;
+    const fillId = `flow-node-fill-${graph.graph_id || 'graph'}`;
+    const eyebrowLabel = graph.provider === 'neo4j' ? 'Neo4j Flow Graph' : 'Structured Flow Graph';
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        scrollRef.current?.scrollTo({ left: 0, behavior: 'auto' });
+    }, [graph.graph_id, graph.title, graph.nodes.length, graph.edges.length]);
+
+    const handleHorizontalScroll = (event: ReactWheelEvent<HTMLDivElement>) => {
+        if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.currentTarget.scrollLeft += event.deltaY;
+    };
+
+    return (
+        <div className="flow-graph-shell">
+            <div className="flow-graph-header">
+                <div>
+                    <p className="flow-graph-eyebrow">{eyebrowLabel}</p>
+                    <h5 className="flow-graph-title">{graph.title || 'AI Teacher Flow Graph'}</h5>
+                </div>
+                <span className="flow-graph-badge">{graph.provider || 'neo4j'}</span>
+            </div>
+            <p className="flow-graph-hint">Scroll left and right to explore the full graph.</p>
+            <div ref={scrollRef} className="flow-graph-scroll" onWheel={handleHorizontalScroll}>
+                <svg
+                    viewBox={`0 0 ${layout.width} ${layout.height}`}
+                    width={layout.width}
+                    height={layout.height}
+                    className="flow-graph-svg"
+                    preserveAspectRatio="xMinYMin meet"
+                    role="img"
+                    aria-label={graph.title || 'AI Teacher Flow Graph'}
+                >
+                    <defs>
+                        <linearGradient id={fillId} x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#eff6ff" />
+                            <stop offset="100%" stopColor="#dbeafe" />
+                        </linearGradient>
+                        <marker id={arrowId} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
+                        </marker>
+                    </defs>
+
+                    {graph.edges.map((edge) => {
+                        const source = layout.positions.get(edge.source);
+                        const target = layout.positions.get(edge.target);
+                        if (!source || !target) return null;
+
+                        const startX = source.x + layout.nodeWidth;
+                        const startY = source.y + layout.nodeHeight / 2;
+                        const endX = target.x;
+                        const endY = target.y + layout.nodeHeight / 2;
+                        const curve = Math.max(56, (endX - startX) / 2);
+                        const path = `M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}`;
+                        const labelX = (startX + endX) / 2;
+                        const labelY = (startY + endY) / 2 - 14;
+                        const { display, width } = getFlowEdgeLabelMetrics(edge.label || '');
+
+                        return (
+                            <g key={edge.id}>
+                                <path d={path} className="flow-edge" markerEnd={`url(#${arrowId})`} />
+                                {edge.label && (
+                                    <g transform={`translate(${labelX}, ${labelY})`}>
+                                        <rect x={-width / 2} y={-14} width={width} height={28} rx={14} className="flow-edge-label-bg" />
+                                        <text textAnchor="middle" dominantBaseline="central" className="flow-edge-label">
+                                            {display}
+                                        </text>
+                                    </g>
+                                )}
+                            </g>
+                        );
+                    })}
+
+                    {graph.nodes.map((node) => {
+                        const position = layout.positions.get(node.id);
+                        if (!position) return null;
+                        const labelLines = wrapFlowNodeLabel(node.label);
+                        const nodeRole = getFlowNodeRole(node.id, graph);
+                        const firstLineY = labelLines.length > 1 ? 56 : 62;
+
+                        return (
+                            <g key={node.id} transform={`translate(${position.x}, ${position.y})`}>
+                                <rect width={layout.nodeWidth} height={layout.nodeHeight} rx={24} className="flow-node-card" fill={`url(#${fillId})`} />
+                                <circle cx="30" cy="34" r="10" className="flow-node-dot" />
+                                <text x="52" y="29" className="flow-node-caption">{nodeRole}</text>
+                                <text x="28" y={firstLineY} className="flow-node-label">
+                                    {labelLines.map((line, index) => (
+                                        <tspan key={`${node.id}-${index}`} x="28" dy={index === 0 ? 0 : 18}>
+                                            {line}
+                                        </tspan>
+                                    ))}
+                                </text>
+                            </g>
+                        );
+                    })}
+                </svg>
+            </div>
+        </div>
+    );
+};
+
 const DiagramBlock = ({ engine, code }: { engine: string, code: string }) => {
     const [svg, setSvg] = useState('');
+    const [graph, setGraph] = useState<FlowGraphPayload | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (!code) return;
-        
+
+        const controller = new AbortController();
+        let isActive = true;
+
         const renderDiagram = async () => {
             setLoading(true);
             setError(null);
+            setSvg('');
+            setGraph(null);
             try {
-                // Use Kroki API with a specific D2 theme if possible, or handle via CSS
-                const response = await fetch(`https://kroki.io/${engine}/svg`, {
+                if (engine === 'd2') {
+                    const graphResponse = await apiFetch(`${API_BASE_URL}/teacher/render-flow-graph`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code, title: 'AI Teacher Flow Graph' }),
+                        signal: controller.signal,
+                    });
+
+                    if (!graphResponse.ok) {
+                        const graphErrorText = await getResponseErrorMessage(graphResponse);
+                        throw new Error(graphErrorText || graphResponse.statusText);
+                    }
+
+                    const graphData = await graphResponse.json();
+                    if (isActive) {
+                        setGraph(graphData);
+                    }
+                    return;
+                }
+
+                const response = await apiFetch(`${API_BASE_URL}/teacher/render-diagram`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: code,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ engine, code }),
+                    signal: controller.signal,
                 });
 
                 if (!response.ok) {
-                    const errorText = await response.text();
+                    const errorText = await getResponseErrorMessage(response);
                     throw new Error(errorText || response.statusText);
                 }
 
                 const svgText = await response.text();
-                setSvg(svgText);
+                if (isActive) {
+                    setSvg(svgText);
+                }
             } catch (e: any) {
+                if (e?.name === 'AbortError') {
+                    return;
+                }
                 console.error("Diagram render error", e);
-                setError(e?.message || 'Failed to render diagram');
+                if (isActive) {
+                    if (engine === 'd2') {
+                        const fallbackGraph = parseD2FlowGraph(code);
+                        if (fallbackGraph.nodes.length > 0) {
+                            setGraph({
+                                ...fallbackGraph,
+                                title: 'AI Teacher Flow Graph',
+                                provider: 'local-fallback',
+                            });
+                        } else {
+                            setError(e?.message || 'Failed to render diagram');
+                        }
+                    } else {
+                        setError(e?.message || 'Failed to render diagram');
+                    }
+                }
             } finally {
-                setLoading(false);
+                if (isActive) {
+                    setLoading(false);
+                }
             }
         };
 
         renderDiagram();
+
+        return () => {
+            isActive = false;
+            controller.abort();
+        };
     }, [code, engine]);
 
     if (error) {
@@ -214,7 +628,9 @@ const DiagramBlock = ({ engine, code }: { engine: string, code: string }) => {
                     <span>Architecting {engine.toUpperCase()}...</span>
                 </div>
             )}
-            {svg ? (
+            {graph ? (
+                <FlowGraphCanvas graph={graph} />
+            ) : svg ? (
                 <div 
                     dangerouslySetInnerHTML={{ __html: svg }} 
                     className="diagram-svg-container"
@@ -266,7 +682,7 @@ export const Teacher = () => {
         if (!user?.email) return;
         setNotesLoading(true);
         try {
-            const res = await fetch(`http://127.0.0.1:8000/student/notes?user_email=${encodeURIComponent(user.email)}`);
+            const res = await apiFetch(`${API_BASE_URL}/student/notes?user_email=${encodeURIComponent(user.email)}`);
             const data = await res.json();
             setSavedNotes(data.notes || []);
         } catch { setSavedNotes([]); }
@@ -283,7 +699,7 @@ export const Teacher = () => {
 
         const initFromProfile = async () => {
             try {
-                const res = await fetch(`http://127.0.0.1:8000/student/profile?user_email=${encodeURIComponent(user.email)}`);
+                const res = await apiFetch(`${API_BASE_URL}/student/profile?user_email=${encodeURIComponent(user.email)}`);
                 const data = await res.json();
                 
                 if (data.profile?.domain) {
@@ -302,6 +718,8 @@ export const Teacher = () => {
     const totalMilestones = selectedRoadmap?.phases.reduce((acc, p) => acc + p.milestones.length, 0) || 0;
     const doneCount = Object.values(status).filter(s => s === 'done').length;
     const overallProgress = totalMilestones > 0 ? Math.round((doneCount / totalMilestones) * 100) : 0;
+    const showReferenceImage = explanation?.image_url ? isTrustedReferenceImageUrl(explanation.image_url) : false;
+    const hasLessonMedia = showReferenceImage || Boolean(explanation?.video_url);
 
     const milestoneKey = milestone ? `${phaseIdx}-${milestoneIdx}` : '';
 
@@ -359,7 +777,7 @@ export const Teacher = () => {
         const currentFile = attachedFile;
         
         let imageUrl = '';
-        if (currentFile) {
+        if (currentFile?.type.startsWith('image/')) {
             imageUrl = URL.createObjectURL(currentFile);
         }
 
@@ -568,6 +986,7 @@ export const Teacher = () => {
         const lines = text.split('\n');
         const elements: React.ReactNode[] = [];
         let i = 0;
+        let lastHeadingContext = '';
 
         while (i < lines.length) {
             const line = lines[i];
@@ -593,6 +1012,33 @@ export const Teacher = () => {
                     </div>
                 );
                 i++; continue;
+            }
+
+            // --- Raw D2 fallback for stale cached explanations without ```d2 fences ---
+            if (
+                /flowchart|diagram|architecture/i.test(lastHeadingContext) &&
+                looksLikeD2Line(line)
+            ) {
+                const diagramLines: string[] = [];
+                while (i < lines.length) {
+                    const currentLine = lines[i];
+                    if (!currentLine.trim()) break;
+                    if (!looksLikeD2Line(currentLine)) break;
+                    diagramLines.push(currentLine);
+                    i++;
+                }
+
+                if (diagramLines.length > 0) {
+                    elements.push(
+                        <div key={`raw-d2-${i}`} style={{ margin: '1.5rem 0', background: 'rgba(100,130,255,0.02)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(100,130,255,0.1)' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--primary-600)', marginBottom: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '1rem' }}>📊</span> D2 Architecture
+                            </div>
+                            <DiagramBlock engine="d2" code={diagramLines.join('\n')} />
+                        </div>
+                    );
+                    continue;
+                }
             }
 
             // --- Block Math: $$ ... $$ or \begin{env} ... \end{env} or \[ ... \] ---
@@ -688,14 +1134,17 @@ export const Teacher = () => {
 
             // --- Headings ---
             if (line.startsWith('### ')) {
+                lastHeadingContext = line.slice(4);
                 elements.push(<h5 key={i} style={{ color: 'var(--primary-600)', fontSize: '0.95rem', fontWeight: 800, margin: '1rem 0 0.4rem' }}>{renderInline(line.slice(4))}</h5>);
                 i++; continue;
             }
             if (line.startsWith('## ')) {
+                lastHeadingContext = line.slice(3);
                 elements.push(<h4 key={i} style={{ color: 'var(--primary-600)', fontSize: '1rem', fontWeight: 800, margin: '1.25rem 0 0.5rem', borderBottom: '1px solid rgba(100,130,255,0.15)', paddingBottom: '4px' }}>{renderInline(line.slice(3))}</h4>);
                 i++; continue;
             }
             if (line.startsWith('# ')) {
+                lastHeadingContext = line.slice(2);
                 elements.push(<h3 key={i} style={{ color: 'var(--primary-700)', fontSize: '1.1rem', fontWeight: 900, margin: '1rem 0 0.5rem' }}>{renderInline(line.slice(2))}</h3>);
                 i++; continue;
             }
@@ -987,25 +1436,27 @@ export const Teacher = () => {
                                 <button
                                     className="btn btn-secondary"
                                     style={{ fontSize: '0.72rem', padding: '0.35rem 0.8rem' }}
-                                    onClick={() => selectedRoadmap && loadExplanation(selectedRoadmap, phaseIdx, milestoneIdx)}
+                                    onClick={() => selectedRoadmap && loadExplanation(selectedRoadmap, phaseIdx, milestoneIdx, true)}
                                 >
                                     ↻ Regenerate
                                 </button>
                             )}
                         </div>
 
-                        {explanation?.image_url && (
+                        {hasLessonMedia && (
                              <div className="flex gap-md mb-lg justify-center" style={{ flexWrap: 'wrap' }}>
-                                 <div className="glass-card" style={{ padding: '0.4rem', width: '400px', flexShrink: 0 }}>
-                                     <img 
-                                        src={explanation.image_url} 
-                                        alt="Visual Context" 
-                                        style={{ width: '100%', maxHeight: '250px', objectFit: 'cover', borderRadius: '8px' }} 
-                                     />
-                                     <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '4px', fontWeight: 700 }}>TECHNICAL REFERENCE IMAGE</p>
-                                 </div>
-                                  {explanation.video_url && (
-                                      <div className="glass-card" style={{ padding: '0.4rem', width: '400px', flexShrink: 0 }}>
+                                 {showReferenceImage && explanation?.image_url && (
+                                     <div className="glass-card" style={{ padding: '0.4rem', width: '400px', flexShrink: 0 }}>
+                                         <img
+                                            src={explanation.image_url}
+                                            alt="Visual Context"
+                                            style={{ width: '100%', maxHeight: '250px', objectFit: 'cover', borderRadius: '8px' }}
+                                         />
+                                         <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '4px', fontWeight: 700 }}>TECHNICAL REFERENCE IMAGE</p>
+                                     </div>
+                                 )}
+                                 {explanation?.video_url && (
+                                     <div className="glass-card" style={{ padding: '0.4rem', width: '400px', flexShrink: 0 }}>
                                          {explanation.video_url.includes('youtube.com') || explanation.video_url.includes('youtu.be') ? (
                                              <YouTubeEmbed url={explanation.video_url} />
                                          ) : (
@@ -1163,13 +1614,13 @@ export const Teacher = () => {
                                              id="doubt-file-upload"
                                              hidden
                                              onChange={(e) => setAttachedFile(e.target.files?.[0] || null)}
-                                             accept="image/*"
+                                             accept=".pdf,.doc,.docx,image/png,image/jpeg,image/webp"
                                          />
                                          <button 
                                             className="btn btn-secondary"
                                             style={{ padding: '0.6rem' }}
                                             onClick={() => document.getElementById('doubt-file-upload')?.click()}
-                                            title="Attach Screenshot"
+                                            title="Attach PDF, document, or image"
                                          >
                                              📎
                                          </button>
@@ -1351,6 +1802,133 @@ export const Teacher = () => {
 
                 .diagram-svg-container svg path {
                     stroke: #2563eb !important; /* Blue arrows */
+                }
+
+                .flow-graph-shell {
+                    width: 100%;
+                    border-radius: 22px;
+                    padding: 1rem;
+                    background:
+                        radial-gradient(circle at top left, rgba(37,99,235,0.12), transparent 42%),
+                        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(239,246,255,0.98));
+                    border: 1px solid rgba(37,99,235,0.16);
+                    box-shadow: 0 24px 50px rgba(37,99,235,0.08);
+                }
+
+                .flow-graph-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 1rem;
+                    margin-bottom: 0.9rem;
+                }
+
+                .flow-graph-eyebrow {
+                    margin: 0 0 0.15rem;
+                    font-size: 0.7rem;
+                    font-weight: 800;
+                    letter-spacing: 0.12em;
+                    text-transform: uppercase;
+                    color: #2563eb;
+                }
+
+                .flow-graph-title {
+                    margin: 0;
+                    font-size: 1rem;
+                    font-weight: 800;
+                    color: #0f172a;
+                }
+
+                .flow-graph-badge {
+                    padding: 0.42rem 0.8rem;
+                    border-radius: 999px;
+                    background: rgba(37,99,235,0.12);
+                    color: #1d4ed8;
+                    font-size: 0.72rem;
+                    font-weight: 800;
+                    letter-spacing: 0.04em;
+                    text-transform: uppercase;
+                }
+
+                .flow-graph-hint {
+                    margin: 0 0 0.75rem;
+                    font-size: 0.78rem;
+                    color: #475569;
+                }
+
+                .flow-graph-scroll {
+                    width: 100%;
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    padding-bottom: 0.4rem;
+                    cursor: grab;
+                    scrollbar-width: thin;
+                    scrollbar-color: rgba(147, 197, 253, 0.95) rgba(15, 23, 42, 0.92);
+                    touch-action: pan-x;
+                }
+
+                .flow-graph-scroll:active {
+                    cursor: grabbing;
+                }
+
+                .flow-graph-scroll::-webkit-scrollbar {
+                    height: 10px;
+                }
+
+                .flow-graph-scroll::-webkit-scrollbar-track {
+                    background: rgba(15, 23, 42, 0.92);
+                    border-radius: 999px;
+                }
+
+                .flow-graph-scroll::-webkit-scrollbar-thumb {
+                    border-radius: 999px;
+                    background: linear-gradient(90deg, #d946ef, #7c3aed);
+                }
+
+                .flow-graph-svg {
+                    display: block;
+                }
+
+                .flow-node-card {
+                    stroke: rgba(37,99,235,0.28);
+                    stroke-width: 1.5px;
+                }
+
+                .flow-node-dot {
+                    fill: #2563eb;
+                }
+
+                .flow-node-caption {
+                    font-size: 12px;
+                    font-weight: 700;
+                    fill: #64748b;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                }
+
+                .flow-node-label {
+                    font-size: 16px;
+                    font-weight: 800;
+                    fill: #0f172a;
+                }
+
+                .flow-edge {
+                    fill: none;
+                    stroke: #2563eb;
+                    stroke-width: 3;
+                    stroke-linecap: round;
+                    opacity: 0.95;
+                }
+
+                .flow-edge-label-bg {
+                    fill: rgba(255,255,255,0.96);
+                    stroke: rgba(37,99,235,0.18);
+                }
+
+                .flow-edge-label {
+                    font-size: 11px;
+                    font-weight: 800;
+                    fill: #1d4ed8;
                 }
 
                 .diagram-error-card {

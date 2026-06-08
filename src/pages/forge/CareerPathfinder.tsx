@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useResponsive } from '../../hooks/useResponsive';
+import API_BASE_URL, { apiFetch } from '../../config';
+import { getRoleForDomain, TARGET_ROLES } from '../../utils/profileDefaults';
 
 interface JobMarketItem {
     title: string;
@@ -8,6 +11,18 @@ interface JobMarketItem {
     skills: string[];
     suitability_score?: number;
     origin?: string;
+    matched_skills?: string[];
+    missing_skills?: string[];
+    score_reasons?: string[];
+    aggregate_result?: boolean;
+    low_detail_source?: boolean;
+    evidence?: {
+        title: string;
+        source: string;
+        snippet: string;
+        link: string;
+        origin: string;
+    };
 }
 
 interface ResumeProject {
@@ -26,6 +41,13 @@ interface CareerReport {
     market_required_skills: string[];
     matched_skills: string[];
     missing_skills: string[];
+    skill_evidence?: {
+        skill: string;
+        present_in_resume: boolean;
+        source_count: number;
+        evidence: { title: string; source: string; link: string; snippet: string }[];
+        why_it_matters: string;
+    }[];
     job_market: JobMarketItem[];
     proceed_guide: {
         immediate: string[];
@@ -50,22 +72,65 @@ interface CareerReport {
         demand_level: string;
         key_hiring_companies: string[];
         recent_trend: string;
+        confidence?: string;
+        methodology?: string;
+        source_titles?: string[];
+        no_fallback_used?: boolean;
     };
     historical_market?: {
         trend_line: { year: string; count: number }[];
         top_historical_companies: { name: string; count: number }[];
         total_historical_records: number;
+        source_records?: {
+            title: string;
+            link: string;
+            source: string;
+            snippet: string;
+            professional_summary?: string;
+            date?: string;
+        }[];
+        source_domains?: { name: string; count: number }[];
+        confidence?: string;
+        methodology?: string;
+        error?: string;
+        no_fallback_used?: boolean;
     };
     risk_assessment?: {
         score: number;
         level: string;
         reasons: string[];
+        confidence?: string;
+        evidence_available?: boolean;
+        source_records?: {
+            title: string;
+            link: string;
+            source: string;
+            snippet: string;
+            professional_summary?: string;
+            date?: string;
+        }[];
+        source_domains?: { name: string; count: number }[];
+        methodology?: string;
+        no_fallback_used?: boolean;
+    };
+    readiness_explanation?: {
+        formula: string;
+        confidence: string;
+        note: string;
+        components: { name: string; value: number; weight: number }[];
+    };
+    analysis_quality?: {
+        job_evidence_count: number;
+        market_skill_source: string;
+        warning: string;
     };
 }
 
 export const CareerPathfinder = () => {
+    const { isMobile, isTablet } = useResponsive();
+    const isCompact = isMobile || isTablet;
     const [file, setFile] = useState<File | null>(null);
-    const [role, setRole] = useState('Fullstack Developer');
+    const [role, setRole] = useState('');
     const [level, setLevel] = useState('Junior');
     const [city, setCity] = useState('Bengaluru');
     const [isLoading, setIsLoading] = useState(false);
@@ -74,18 +139,32 @@ export const CareerPathfinder = () => {
     const [hasStoredResume, setHasStoredResume] = useState(false);
     const [isSubscribing, setIsSubscribing] = useState(false);
     const [subscribeMsg, setSubscribeMsg] = useState('');
+    const [profileDomain, setProfileDomain] = useState('');
 
     useEffect(() => {
         const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
         if (!user.email) return;
-        fetch(`http://127.0.0.1:8000/resume-status?user_email=${encodeURIComponent(user.email)}`)
+        apiFetch(`${API_BASE_URL}/resume-status?user_email=${encodeURIComponent(user.email)}`)
             .then((r) => r.json())
             .then((d) => setHasStoredResume(Boolean(d?.has_stored_resume)))
             .catch(() => setHasStoredResume(false));
+        apiFetch(`${API_BASE_URL}/student/profile?user_email=${encodeURIComponent(user.email)}`)
+            .then((r) => r.json())
+            .then((d) => {
+                const domain = d?.profile?.domain;
+                const mappedRole = getRoleForDomain(domain);
+                if (domain) setProfileDomain(domain);
+                if (mappedRole) setRole(mappedRole);
+            })
+            .catch(() => undefined);
     }, []);
 
     const analyzeCareerPath = async () => {
         if (!file && !hasStoredResume) return;
+        if (!role) {
+            setError('Select a target role before running Career Pathfinder.');
+            return;
+        }
         setIsLoading(true);
         setError('');
         setReport(null);
@@ -99,7 +178,7 @@ export const CareerPathfinder = () => {
         if (user.email) formData.append('user_email', user.email);
 
         try {
-            const res = await fetch('http://127.0.0.1:8000/career-pathfinder', {
+            const res = await apiFetch(`${API_BASE_URL}/career-pathfinder`, {
                 method: 'POST',
                 body: formData
             });
@@ -122,10 +201,14 @@ export const CareerPathfinder = () => {
             setSubscribeMsg('Please log in to subscribe.');
             return;
         }
+        if (!role) {
+            setSubscribeMsg('Select a target role before subscribing.');
+            return;
+        }
         setIsSubscribing(true);
         setSubscribeMsg('');
         try {
-            const res = await fetch('http://127.0.0.1:8000/job-agent/subscribe', {
+            const res = await apiFetch(`${API_BASE_URL}/job-agent/subscribe`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -155,23 +238,37 @@ export const CareerPathfinder = () => {
                 <p style={{ color: 'var(--text-secondary)' }}>Resume-driven roadmap, market demand, and city-specific role guidance</p>
             </header>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) minmax(0, 1fr)', gap: '2.5rem' }} className="career-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(280px, 320px) minmax(0, 1fr)', gap: '2.5rem' }} className="career-grid">
                 <div className="glass-card flex-col gap-lg" style={{ padding: '1.5rem', height: 'fit-content' }}>
                     <h3 style={{ fontSize: '1rem', color: 'var(--primary-400)' }}>Career Inputs</h3>
+                    {profileDomain && (
+                        <div style={{
+                            padding: '0.75rem 0.9rem',
+                            border: '1px solid var(--glass-border)',
+                            borderRadius: 'var(--radius-md)',
+                            background: 'rgba(34, 211, 238, 0.06)',
+                            color: 'var(--text-secondary)',
+                            fontSize: '0.78rem',
+                            fontWeight: 700
+                        }}>
+                            Domain: <span style={{ color: 'var(--primary-400)' }}>{profileDomain}</span>
+                        </div>
+                    )}
 
                     <div className="flex-col gap-xs">
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Target Role</span>
                         <select value={role} onChange={(e) => setRole(e.target.value)} className="btn btn-secondary" style={{ padding: '0.6rem', textAlign: 'left' }}>
-                            <option>Fullstack Developer</option>
-                            <option>Frontend Engineer</option>
-                            <option>Data Scientist</option>
-                            <option>DevOps Engineer</option>
+                            <option value="" disabled>Select target role</option>
+                            {TARGET_ROLES.map((targetRole) => (
+                                <option key={targetRole}>{targetRole}</option>
+                            ))}
                         </select>
                     </div>
 
                     <div className="flex-col gap-xs">
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Experience Level</span>
                         <select value={level} onChange={(e) => setLevel(e.target.value)} className="btn btn-secondary" style={{ padding: '0.6rem', textAlign: 'left' }}>
+                            <option>Fresher</option>
                             <option>Junior</option>
                             <option>Mid-Level</option>
                             <option>Senior</option>
@@ -203,7 +300,7 @@ export const CareerPathfinder = () => {
                         </label>
                     </div>
 
-                    <button className="btn btn-primary w-full" disabled={(!file && !hasStoredResume) || isLoading} onClick={analyzeCareerPath}>
+                    <button className="btn btn-primary w-full" disabled={!role || (!file && !hasStoredResume) || isLoading} onClick={analyzeCareerPath}>
                         {isLoading ? 'ANALYZING MARKET...' : file ? 'BUILD CAREER STRATEGY' : 'USE STORED RESUME STRATEGY'}
                     </button>
                     {hasStoredResume && !file && (
@@ -224,7 +321,7 @@ export const CareerPathfinder = () => {
                         <button 
                             className="btn btn-secondary w-full" 
                             onClick={handleSubscribe} 
-                            disabled={isSubscribing}
+                            disabled={!role || isSubscribing}
                         >
                             {isSubscribing ? 'SUBSCRIBING...' : '🔔 SUBSCRIBE TO JOB ALERTS'}
                         </button>
@@ -257,13 +354,36 @@ export const CareerPathfinder = () => {
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <span style={{ fontSize: '2.4rem', fontWeight: 900, color: 'var(--accent-blue)', textShadow: '0 0 20px rgba(0,100,255,0.3)' }}>{report.readiness_score}%</span>
-                                        <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', opacity: 0.7, fontWeight: 800 }}>Global Suitability</p>
+                                        <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', opacity: 0.7, fontWeight: 800 }}>Evidence-Based Readiness</p>
                                     </div>
                                 </div>
                             </div>
 
+                            {report.analysis_quality?.warning && (
+                                <div className="glass-card" style={{ padding: '1rem 1.25rem', border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.04)' }}>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--accent-orange)', lineHeight: 1.5 }}>{report.analysis_quality.warning}</p>
+                                </div>
+                            )}
+
+                            {report.readiness_explanation && (
+                                <div className="glass-card" style={{ padding: '1.5rem' }}>
+                                    <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>How This Score Was Calculated</h3>
+                                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>{report.readiness_explanation.formula}</p>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>Confidence: {report.readiness_explanation.confidence}. {report.readiness_explanation.note}</p>
+                                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '0.75rem', marginTop: '1rem' }}>
+                                        {report.readiness_explanation.components.map((item) => (
+                                            <div key={item.name} style={{ padding: '0.85rem', border: '1px solid var(--glass-border)', borderRadius: '8px' }}>
+                                                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800 }}>{item.name}</p>
+                                                <p style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary-400)' }}>{item.value}%</p>
+                                                <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Weight {item.weight}%</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {report.capability_analysis && (
-                                <div className="glass-card grid grid-cols-3 gap-md" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '1.5rem', gap: '1rem' }}>
+                                <div className="glass-card grid grid-cols-3 gap-md" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : '1fr 1fr 1fr', padding: '1.5rem', gap: '1rem' }}>
                                     {[
                                         { label: 'Resume Match', val: report.capability_analysis.resume_match, color: 'var(--accent-blue)', icon: '📄' },
                                         { label: 'Quiz Capability', val: report.capability_analysis.quiz_performance, color: 'var(--accent-teal)', icon: '📝' },
@@ -299,6 +419,28 @@ export const CareerPathfinder = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {(report.skill_evidence || []).length > 0 && (
+                                <div className="glass-card" style={{ padding: '1.5rem' }}>
+                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Skill Evidence From Market Signals</h3>
+                                    <div className="flex-col gap-sm">
+                                        {(report.skill_evidence || []).slice(0, 8).map((row) => (
+                                            <div key={row.skill} style={{ padding: '0.9rem', border: '1px solid var(--glass-border)', borderRadius: '8px', background: row.present_in_resume ? 'rgba(52,160,90,0.04)' : 'rgba(239,68,68,0.035)' }}>
+                                                <div className="flex justify-between gap-sm" style={{ flexWrap: 'wrap' }}>
+                                                    <strong style={{ fontSize: '0.86rem', color: row.present_in_resume ? 'var(--accent-green)' : 'var(--accent-red)' }}>{row.skill}</strong>
+                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{row.source_count} source signals</span>
+                                                </div>
+                                                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45, marginTop: '0.35rem' }}>{row.why_it_matters}</p>
+                                                {row.evidence[0] && (
+                                                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45, marginTop: '0.35rem' }}>
+                                                        Evidence: {row.evidence[0].title} from {row.evidence[0].source}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {report.resume_projects && report.resume_projects.length > 0 && (
                                 <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid rgba(100,130,255,0.15)' }}>
@@ -350,15 +492,15 @@ export const CareerPathfinder = () => {
                             </div>
 
                             {report.risk_assessment && (
-                                <div className="glass-card" style={{ padding: '1.5rem', border: `1px solid ${report.risk_assessment.level === 'High' ? 'var(--accent-red)' : 'var(--accent-orange)'}`, background: 'rgba(239,68,68,0.02)' }}>
-                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 'sm', color: report.risk_assessment.level === 'High' ? 'var(--accent-red)' : 'var(--accent-orange)' }}>
-                                        🛡️ Recruitment Risk Assessment
+                                <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid var(--glass-border)', background: 'rgba(16,185,129,0.03)' }}>
+                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-400)' }}>
+                                        🛡️ Recruitment Risk Source Evidence
                                     </h3>
                                     <div className="flex justify-between items-center" style={{ marginBottom: '1rem' }}>
-                                        <p style={{ fontSize: '0.9rem' }}>Risk Level: <strong>{report.risk_assessment.level}</strong></p>
-                                        <div style={{ width: '100px', height: '8px', background: 'var(--glass-border)', borderRadius: '4px', overflow: 'hidden' }}>
-                                            <div style={{ width: `${report.risk_assessment.score}%`, height: '100%', background: report.risk_assessment.level === 'High' ? 'var(--accent-red)' : 'var(--accent-orange)' }} />
-                                        </div>
+                                        <p style={{ fontSize: '0.9rem' }}>Status: <strong>{report.risk_assessment.level}</strong></p>
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            {(report.risk_assessment.source_records || []).length} sources
+                                        </p>
                                     </div>
                                     <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                                         {report.risk_assessment.reasons.map((r, i) => (
@@ -367,26 +509,75 @@ export const CareerPathfinder = () => {
                                             </li>
                                         ))}
                                     </ul>
+                                    {(report.risk_assessment.source_domains || []).length > 0 && (
+                                        <div className="flex flex-wrap gap-xs" style={{ marginTop: '0.8rem' }}>
+                                            {(report.risk_assessment.source_domains || []).map(source => (
+                                                <span key={source.name} className="badge" style={{ background: 'transparent', borderColor: 'rgba(100,130,255,0.3)' }}>
+                                                    {source.name} ({source.count})
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {(report.risk_assessment.source_records || []).length > 0 && (
+                                        <div className="flex-col gap-sm" style={{ marginTop: '1rem' }}>
+                                            {(report.risk_assessment.source_records || []).slice(0, 5).map(source => (
+                                                <a
+                                                    key={source.link}
+                                                    href={source.link}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    style={{ display: 'block', padding: '0.75rem', border: '1px solid var(--glass-border)', borderRadius: '10px', textDecoration: 'none', background: 'rgba(255,255,255,0.02)' }}
+                                                >
+                                                    <p style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{source.title}</p>
+                                                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{source.source}{source.date ? ` • ${source.date}` : ''}</p>
+                                                    <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '0.35rem', lineHeight: 1.45 }}>{source.professional_summary || source.snippet}</p>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {report.risk_assessment.confidence && (
+                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
+                                            Confidence: {report.risk_assessment.confidence}
+                                        </p>
+                                    )}
+                                    {report.risk_assessment.methodology && (
+                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                                            {report.risk_assessment.methodology}
+                                        </p>
+                                    )}
                                 </div>
                             )}
 
                             {report.live_job_demand && (
                                 <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid var(--primary-500)', background: 'linear-gradient(135deg, rgba(16,185,129,0.05) 0%, rgba(0,0,0,0) 100%)' }}>
                                     <h3 style={{ fontSize: '1rem', color: 'var(--primary-400)', marginBottom: '1rem' }}>📡 Real-time Market Signals</h3>
-                                    <div className="grid grid-cols-2 gap-md" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.2rem' }}>
+                                    <div className="grid grid-cols-2 gap-md" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem', marginBottom: '1.2rem' }}>
                                         <div className="flex-col" style={{ padding: '1rem', background: 'var(--glass-border)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
                                             <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Current Demand</span>
                                             <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent-teal)' }}>{report.live_job_demand.demand_level}</span>
                                         </div>
                                         <div className="flex-col" style={{ padding: '1rem', background: 'var(--glass-border)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Found</span>
-                                            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent-blue)' }}>{report.live_job_demand.signal_count}+</span>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Source Signals Found</span>
+                                            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent-blue)' }}>{report.live_job_demand.signal_count}</span>
                                         </div>
                                     </div>
                                     <div className="flex-col gap-sm">
                                         <p style={{ fontSize: '0.82rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
                                             <strong>Key Insight:</strong> {report.live_job_demand.recent_trend}
                                         </p>
+                                        {report.live_job_demand.methodology && (
+                                            <p style={{ fontSize: '0.72rem', lineHeight: 1.45, color: 'var(--text-muted)' }}>
+                                                {report.live_job_demand.methodology}
+                                            </p>
+                                        )}
+                                        {(report.live_job_demand.source_titles || []).length > 0 && (
+                                            <div style={{ marginTop: '0.5rem' }}>
+                                                <p style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>SOURCE EVIDENCE:</p>
+                                                <ul style={{ margin: '0 0 0 1rem', padding: 0, fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                                                    {(report.live_job_demand.source_titles || []).slice(0, 3).map((title) => <li key={title}>{title}</li>)}
+                                                </ul>
+                                            </div>
+                                        )}
                                         {report.live_job_demand.key_hiring_companies.length > 0 && (
                                             <div style={{ marginTop: '0.5rem' }}>
                                                 <p style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>ACTIVE HIRING AT:</p>
@@ -403,33 +594,34 @@ export const CareerPathfinder = () => {
 
                             {report.historical_market && report.historical_market.total_historical_records > 0 && (
                                 <div className="glass-card" style={{ padding: '1.5rem' }}>
-                                    <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem' }}>📜 Long-Term Market Stability (2021-2025)</h3>
-                                    <div className="flex gap-md" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: '100px', background: 'rgba(52,160,90,0.02)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
-                                        {report.historical_market.trend_line.map((item, i) => {
-                                            const trendVals = report.historical_market?.trend_line.map(t => t.count) || [1];
-                                            const max = Math.max(...trendVals, 1);
-                                            const h = (item.count / max) * 100;
-                                            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-                                            return (
-                                                <div key={item.year} className="flex-col items-center gap-xs" style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-                                                    <div className="bar-glow"
-                                                        style={{ 
-                                                            width: '80%', 
-                                                            height: `${Math.max(h, 4)}%`, 
-                                                            background: colors[i % colors.length], 
-                                                            borderRadius: '6px 6px 0 0', 
-                                                            opacity: 0.8,
-                                                            transition: 'height 1.2s ease-out'
-                                                        }} 
-                                                    />
-                                                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)' }}>{item.year.slice(2)}</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                    <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem' }}>Verified Indexed Market Sources</h3>
                                     <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                                        Historically, this role has seen the most volume from: <strong>{report.historical_market.top_historical_companies.map(c => c.name).join(', ')}</strong>.
+                                        {report.historical_market.total_historical_records} unique source records inspected.
                                     </p>
+                                    <div className="flex flex-wrap gap-xs" style={{ marginTop: '0.75rem' }}>
+                                        {(report.historical_market.source_domains || []).map(source => (
+                                            <span key={source.name} className="badge" style={{ fontSize: '0.68rem', background: 'transparent', borderColor: 'rgba(100,130,255,0.3)' }}>{source.name} ({source.count})</span>
+                                        ))}
+                                    </div>
+                                    <div className="flex-col gap-sm" style={{ marginTop: '1rem' }}>
+                                        {(report.historical_market.source_records || []).slice(0, 8).map(source => (
+                                            <a key={source.link} href={source.link} target="_blank" rel="noreferrer" style={{ display: 'block', padding: '0.85rem', border: '1px solid var(--glass-border)', borderRadius: '8px', textDecoration: 'none', color: 'inherit', background: 'rgba(255,255,255,0.02)' }}>
+                                                <div className="flex justify-between gap-sm" style={{ alignItems: 'flex-start' }}>
+                                                    <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{source.title}</strong>
+                                                    <span style={{ fontSize: '0.64rem', color: 'var(--accent-teal)', whiteSpace: 'nowrap' }}>{source.source}</span>
+                                                </div>
+                                                {(source.professional_summary || source.snippet) && <p style={{ marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{source.professional_summary || source.snippet}</p>}
+                                            </a>
+                                        ))}
+                                    </div>
+                                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
+                                        {report.historical_market.methodology}
+                                    </p>
+                                    {report.historical_market.confidence && (
+                                        <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                                            Confidence: {report.historical_market.confidence}
+                                        </p>
+                                    )}
                                 </div>
                             )}
 
@@ -451,6 +643,7 @@ export const CareerPathfinder = () => {
                                                     <div className="flex gap-xs items-center" style={{ marginTop: '0.2rem' }}>
                                                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{job.source}</span>
                                                         {job.origin && <span className="badge" style={{ fontSize: '0.6rem', padding: '2px 6px', background: 'var(--glass-border)', color: 'var(--primary-300)' }}>{job.origin}</span>}
+                                                        {job.aggregate_result && <span className="badge" style={{ fontSize: '0.6rem', padding: '2px 6px', background: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.25)', color: 'var(--accent-orange)' }}>Aggregate Source</span>}
                                                     </div>
                                                 </div>
                                                 {job.suitability_score !== undefined && (
@@ -466,6 +659,33 @@ export const CareerPathfinder = () => {
                                                     <span key={s} className="badge" style={{ fontSize: '0.66rem', padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.03)' }}>{s}</span>
                                                 ))}
                                             </div>
+                                            {(job.matched_skills || job.missing_skills) && (
+                                                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '0.6rem', marginTop: '0.75rem' }}>
+                                                    <div>
+                                                        <p style={{ fontSize: '0.65rem', color: 'var(--accent-green)', fontWeight: 800, marginBottom: '0.25rem' }}>MATCHED FROM RESUME</p>
+                                                        <div className="flex flex-wrap gap-xs">
+                                                            {(job.matched_skills || []).slice(0, 5).map((s) => <span key={s} className="badge" style={{ fontSize: '0.62rem', color: 'var(--accent-green)', borderColor: 'rgba(52,160,90,0.35)' }}>{s}</span>)}
+                                                            {!(job.matched_skills || []).length && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>No clear skill match found.</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p style={{ fontSize: '0.65rem', color: 'var(--accent-red)', fontWeight: 800, marginBottom: '0.25rem' }}>GAPS FOR THIS JOB</p>
+                                                        <div className="flex flex-wrap gap-xs">
+                                                            {(job.missing_skills || []).slice(0, 5).map((s) => <span key={s} className="badge" style={{ fontSize: '0.62rem', color: 'var(--accent-red)', borderColor: 'rgba(239,68,68,0.35)' }}>{s}</span>)}
+                                                            {!(job.missing_skills || []).length && (
+                                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                                                    {job.low_detail_source ? 'Full requirements not visible in this source.' : 'No listed gaps.'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {(job.score_reasons || []).length > 0 && (
+                                                <ul style={{ margin: '0.65rem 0 0 1rem', padding: 0, fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                                                    {(job.score_reasons || []).slice(0, 3).map((reason) => <li key={reason}>{reason}</li>)}
+                                                </ul>
+                                            )}
                                         </a>
                                     )) : (
                                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>

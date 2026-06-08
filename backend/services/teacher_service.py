@@ -2,10 +2,14 @@ import os
 import io
 import json
 import re
+import codecs
+from typing import Optional, List, Dict, Any
 from groq import Groq
+import httpx
 from dotenv import load_dotenv
-from services.pexels_service import get_pexels_image, get_pexels_video
+from services.pexels_service import get_pexels_video
 from services.wikipedia_service import get_wikipedia_image
+from services.langgraph_pipelines import run_notes_generation_graph
 import requests
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -15,7 +19,18 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+_groq_client = None
+
+
+def _get_groq_client() -> Groq:
+    """Create the Groq client lazily so import-time dependency issues do not stop FastAPI startup."""
+    global _groq_client
+    if _groq_client is None:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError("GROQ_API_KEY is not configured.")
+        _groq_client = Groq(api_key=api_key, http_client=httpx.Client())
+    return _groq_client
 
 
 def _strip_md(text: str) -> str:
@@ -142,6 +157,101 @@ def _parse_groq_json(raw: str) -> dict:
             raise e2
 
 
+def _recover_failed_generation(error: Exception) -> Optional[dict]:
+    """Best-effort recovery for providers that include a near-valid JSON payload in the error message."""
+    error_msg = str(error)
+    if "failed_generation" not in error_msg:
+        return None
+
+    patterns = [
+        r"failed_generation': '([\s\S]*)'\}\}\s*$",
+        r'"failed_generation": "([\s\S]*)"\}\}\s*$',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, error_msg)
+        if not match:
+            continue
+
+        raw = match.group(1)
+        candidates = [raw]
+
+        try:
+            candidates.append(codecs.decode(raw, "unicode_escape"))
+        except Exception:
+            pass
+
+        for candidate in candidates:
+            try:
+                recovered = _parse_groq_json(candidate)
+                print("Recovered structured payload from failed_generation.")
+                return recovered
+            except Exception as parse_err:
+                print(f"failed_generation recovery parse error: {parse_err}")
+
+    return None
+
+
+def _request_json_completion(messages: list[dict], temperature: float, max_tokens: int) -> dict:
+    """Request structured JSON, then recover or retry if the provider rejects valid-ish output."""
+    try:
+        response = _get_groq_client().chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"}
+        )
+        return _parse_groq_json(response.choices[0].message.content.strip())
+    except Exception as first_error:
+        recovered = _recover_failed_generation(first_error)
+        if recovered is not None:
+            return recovered
+
+        if "json_validate_failed" not in str(first_error):
+            raise first_error
+
+        print("Retrying Groq JSON generation with stricter escaping guidance…")
+        retry_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Your previous reply failed JSON validation. "
+                    "Return ONLY strict JSON. "
+                    "Escape every backslash inside LaTeX and code strings. "
+                    "Do not use markdown fences. "
+                    "If LaTeX would break JSON escaping, simplify the equation text instead of returning invalid JSON."
+                ),
+            },
+            *messages,
+        ]
+
+        try:
+            retry_response = _get_groq_client().chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=retry_messages,
+                temperature=min(temperature, 0.3),
+                max_tokens=max_tokens,
+            )
+            return _parse_groq_json(retry_response.choices[0].message.content.strip())
+        except Exception as retry_error:
+            recovered_retry = _recover_failed_generation(retry_error)
+            if recovered_retry is not None:
+                return recovered_retry
+            raise retry_error
+
+
+def _request_text_completion(messages: list[dict], temperature: float, max_tokens: int) -> str:
+    """Request plain markdown/text content without forcing a JSON wrapper."""
+    response = _get_groq_client().chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    return (response.choices[0].message.content or "").strip()
+
+
 def _sanitize_d2(d2: str) -> str:
     """Robustly clean AI-generated D2 diagram code and inject ELK layout for better spacing."""
     if not d2:
@@ -237,11 +347,13 @@ def get_market_skills(role: str, domain: str) -> dict:
     from services.market_research import get_market_trends
     
     # Live scrape current signals
-    search_query = f"top in-demand technical skills for {role} {domain} 2026 hiring trends india global"
-    market_raw = get_market_trends(search_query)
+    search_query = f"{role} {domain} required skills employee reviews interview questions job description 2026 India startups"
+    market_raw = get_market_trends(search_query, max_results=4)
 
     prompt = f"""You are a Lead Tech Recruiter and Market Intelligence Analyst.
-Based on these current market signals:
+You are comparing a student's resume skills against what employers actually ask for in job descriptions, interview reviews, and startup hiring pages.
+
+Current source signals from Serper searches across Glassdoor/AmbitionBox/Indeed/Wellfound/CutShort/Hirist/Instahyre/LinkedIn/startup sources:
 {market_raw}
 
 For the role: "{role}" in domain: "{domain}", provide a structured JSON response for a student:
@@ -250,13 +362,24 @@ For the role: "{role}" in domain: "{domain}", provide a structured JSON response
 - top_tools: list of 5-6 specific tools/frameworks
 - avg_salary_india: salary range in INR (LPA)
 - demand_level: "Very High" | "High" | "Moderate" | "Low"
+- beginner_summary: 2 simple sentences explaining what this role actually does, for a fresher.
 - growth_trend: A 2-sentence expert outlook on this role's future.
 - trend_analytics: A list of objects for a chart: [ {{"skill": "SkillName", "demand_score": 0-100}}, ... ] (top 6 skills)
+- source_summary: 3 short bullets explaining what employee reviews/interview pages and job descriptions commonly expect.
+- evidence_matrix: list of 6 objects: {{"skill": "SkillName", "demand_score": 0-100, "why_required": "plain English reason", "evidence": "short quote-like source signal summary"}}
+- fresher_action_plan: 5 practical steps a fresher should take next, in priority order.
+- confidence_note: Explain whether the evidence is live-source-backed or limited.
+
+Rules:
+- Prioritize repeated skills from job descriptions and employee/interview review snippets.
+- Include startup-relevant expectations, not only big-company stacks.
+- Keep skills specific and role-matched. For Frontend Engineer, do not include AWS/Azure unless source signals clearly show it for frontend roles.
+- Do not list generic placeholders.
 
 Return ONLY valid JSON."""
 
     try:
-        response = client.chat.completions.create(
+        response = _get_groq_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
@@ -267,14 +390,14 @@ Return ONLY valid JSON."""
     except Exception as e:
         print(f"Market Skills Data Error: {e}")
         return {
-            "required_skills": ["Technical Skill 1", "Technical Skill 2"],
-            "nice_to_have_skills": ["Emerging Tech 1"],
-            "top_tools": ["Industry Tool 1"],
-            "avg_salary_india": "6-15 LPA",
-            "demand_level": "High",
-            "growth_trend": "Market is evolving with focus on AI integration.",
-            "trend_analytics": [{"skill": "Python", "demand_score": 90}, {"skill": "Cloud", "demand_score": 85}],
-            "error": str(e)
+            "error": f"Market research failed: {e}",
+            "no_fallback_used": True,
+            "required_skills": [],
+            "nice_to_have_skills": [],
+            "top_tools": [],
+            "trend_analytics": [],
+            "evidence_matrix": [],
+            "source_summary": [],
         }
 
 def get_pro_coach_beginner_guide(role: str, domain: str) -> dict:
@@ -298,7 +421,7 @@ Return JSON:
 }}
 """
     try:
-        res = client.chat.completions.create(
+        res = _get_groq_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
@@ -306,9 +429,6 @@ Return JSON:
         return _parse_groq_json(res.choices[0].message.content)
     except Exception as e:
         return {"error": str(e)}
-
-
-from typing import Optional, List, Dict, Any
 
 def explain_subtopic(topic: str, subtopic: str, domain: str,
                      has_doubt: bool = False, doubt_text: Optional[str] = None,
@@ -361,31 +481,22 @@ def explain_subtopic(topic: str, subtopic: str, domain: str,
     print("  [5/7] Generating explanation via Groq…")
 
     if has_doubt and doubt_text:
-        system_prompt = f"""You are an industry-expert {domain} tutor. A student is studying "{subtopic}" under "{topic}".
+        explanation_system_prompt = f"""You are an industry-expert {domain} tutor. A student is studying "{subtopic}" under "{topic}".
 {context_injection}
 Provide an exhaustive, high-detail, and master-level solution to their specific doubt.
 INSTRUCTIONS:
 - provide at least 3-4 detailed paragraphs or structured sections.
 - GO BEYOND a simple definition; explain internals, mechanics, and common industry scenarios.
 - ALWAYS include code examples, analogies, and technical nuances.
-- MATHEMATICAL EQUATIONS: Use LaTeX for any mathematical notations. 
+- MATHEMATICAL EQUATIONS: Use LaTeX for any mathematical notations.
   - Wrap inline math in single dollar signs: `$ E = mc^2 $`.
-  - Wrap block math in double dollar signs: `$$ P(A|B) = \frac{{P(B|A)P(A)}}{{P(B)}} $$`.
-- RESEARCH DEPTH: Use formal, academic, and professional language — like a top-tier research paper (e.g., talk about algorithmic complexity, state-space transitions, or architectural isomorphisms where applicable).
-- NEVER leave a list or category empty (e.g., if you write "Examples:", you MUST list 3+ examples).
+  - Wrap block math in double dollar signs: `$$ P(A|B) = \\frac{{P(B|A)P(A)}}{{P(B)}} $$`.
+- RESEARCH DEPTH: Use formal, academic, and professional language.
 - Use professional Markdown (Headings, Bullets, Code Blocks).
-- Ensure the technical depth matches a Senior Engineer's explanation.
-
-Return a JSON object:
-{{
-  "explanation": "An exhaustive, master-level markdown response with research depth and LaTeX math...",
-  "visual_query": "Wikipedia title for the topic",
-  "stock_query": "pexels stock photo keyword",
-  "video_query": "tutorial video query"
-}}
+- Return ONLY the markdown explanation. Do NOT return JSON.
 """
     else:
-        system_prompt = f"""You are a master {domain} tutor and industry expert teaching "{subtopic}" (part of "{topic}").
+        explanation_system_prompt = f"""You are a master {domain} tutor and industry expert teaching "{subtopic}" (part of "{topic}").
 {context_injection}
 Provide an extremely deep, master-level explanation of this topic.
 Your explanation MUST follow this exact structure and style:
@@ -408,70 +519,101 @@ Your explanation MUST follow this exact structure and style:
 (Where does it break? How do experts use it at scale? Discuss optimization paradigms.)
 
 ## 🗺️ Visual System Flowchart
-(The diagram will be automatically rendered from the d2_code key. Do not include it here.)
+(Mention the flow conceptually, but do NOT include diagram code. The diagram is generated separately.)
 
 ## ⚠️ Expert Pitfalls & Optimization
 (What are the 3 things beginners get wrong?)
 
-Also, provide THREE search queries for image/video.
-IMPORTANT: 
-- For `visual_query`, use the most logical title or technical keyword for Wikipedia images.
-- For `stock_query`, use a broad stock photo term for fallback (e.g. "server", "code"). 
-- For `video_query`, use a specific tutorial query.
-
-Return a JSON object:
-{{
-  "explanation": "FULL deep-dive markdown content with Research Depth and LaTeX equations.",
-  "d2_code": "Generate a clean, high-level D2 architecture diagram. \\nRules: \\n1. Focus on a simple layout: 1 main Container for the core system and 1-2 external boxes. \\n2. Max 6-8 nodes total for maximum readability. \\n3. Use 'Source -> Target: \\"Label\\"' syntax — ALWAYS quote labels. \\n4. Use very short 1-2 word labels for connections to avoid overlap. \\n5. Connections MUST be on a single line. \\n6. NO icons, NO complex nesting, NO markdown fences.",
-  "visual_query": "Wikipedia technical title",
-  "stock_query": "stock photo keyword",
-  "video_query": "specific instructional video query"
-}}
+IMPORTANT:
+- Return ONLY markdown explanation text.
+- Do NOT return JSON.
+- Do NOT include ```d2 fences or raw diagram code.
 """
 
-    messages = [{"role": "system", "content": system_prompt}]
+    explanation_messages = [{"role": "system", "content": explanation_system_prompt}]
     if history:
         for msg in history:
-            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+            explanation_messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
     
     if has_doubt and doubt_text:
-        messages.append({"role": "user", "content": doubt_text})
+        explanation_messages.append({"role": "user", "content": doubt_text})
     else:
         # Standard lesson request
-        messages.append({"role": "user", "content": f"Explain {subtopic} in {topic}."})
+        explanation_messages.append({"role": "user", "content": f"Explain {subtopic} in {topic}."})
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=3000,
-            response_format={"type": "json_object"}
+        explanation = _request_text_completion(
+            messages=explanation_messages,
+            temperature=0.55 if has_doubt else 0.65,
+            max_tokens=2600,
         )
-        data = _parse_groq_json(response.choices[0].message.content.strip())
-        explanation = data.get("explanation", "")
-        
-        # Extract and sanitize d2_code
-        d2_code = data.get("d2_code", "").strip()
-        d2_code = re.sub(r'^```(?:d2)?\s*', '', d2_code, flags=re.I)
-        d2_code = re.sub(r'\s*```$', '', d2_code)
-        d2_code = _sanitize_d2(d2_code)
-        print(f"  → Final D2 Source (Fixed):\n{d2_code}")
+        explanation = _normalize_latex_text(explanation)
 
-        # Merge diagram into explanation for frontend renderer
-        if d2_code and "```d2" not in explanation:
-            explanation += f"\n\n## 🗺️ Visual System Flowchart\n```d2\n{d2_code}\n```"
+        d2_code = ""
+        wiki_query = subtopic
+        video_query = f"tutorial {subtopic}"
 
-        # Fetch visuals using Wikipedia (Primary) with Pexels (Fallback)
-        wiki_query = data.get("visual_query") or subtopic
+        if not has_doubt:
+            metadata_messages = [
+                {
+                    "role": "system",
+                    "content": f"""You are generating lightweight lesson metadata for "{subtopic}" in "{topic}" ({domain}).
+Return ONLY strict JSON with these keys:
+- d2_code
+- visual_query
+- stock_query
+- video_query
+
+Rules for d2_code:
+- Max 6 nodes total.
+- Use only simple one-line edges like `A -> B: "Label"`.
+- Keep labels to 1-2 words where possible.
+- No markdown fences.
+- No prose outside JSON.
+""",
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Create flow-graph and media metadata for this lesson.\n\n"
+                        f"Topic: {topic}\n"
+                        f"Subtopic: {subtopic}\n"
+                        f"Domain: {domain}\n\n"
+                        f"Lesson excerpt:\n{explanation[:1400]}"
+                    ),
+                },
+            ]
+
+            try:
+                metadata = _request_json_completion(
+                    messages=metadata_messages,
+                    temperature=0.2,
+                    max_tokens=700,
+                )
+            except Exception as metadata_error:
+                print(f"Teacher metadata generation error: {metadata_error}")
+                metadata = {}
+
+            d2_code = str(metadata.get("d2_code", "") or "").strip()
+            d2_code = re.sub(r'^```(?:d2)?\s*', '', d2_code, flags=re.I)
+            d2_code = re.sub(r'\s*```$', '', d2_code)
+            d2_code = _sanitize_d2(d2_code)
+            if d2_code:
+                print(f"  → Final D2 Source (Fixed):\n{d2_code}")
+                if "```d2" not in explanation:
+                    explanation += f"\n\n## 🗺️ Visual System Flowchart\n```d2\n{d2_code}\n```"
+
+            wiki_query = str(metadata.get("visual_query") or subtopic)
+            video_query = str(metadata.get("video_query") or f"tutorial {subtopic}")
+
+        # Fetch visuals using topic-relevant Wikipedia/Wikimedia diagrams only.
+        # If we cannot find a trustworthy technical image, prefer showing none.
         image_url = get_wikipedia_image(wiki_query)
         
         if not image_url:
-            print(f"  → Wikipedia image not found for '{wiki_query}', falling back to Pexels...")
-            stock_q = data.get("stock_query") or data.get("visual_query") or "technology computer"
-            image_url = get_pexels_image(stock_q)
+            print(f"  → No trustworthy Wikipedia image found for '{wiki_query}'. Skipping image card.")
 
-        video_url = get_pexels_video(data.get("video_query") or f"tutorial {subtopic}")
+        video_url = None if has_doubt else get_pexels_video(video_query)
 
         return {
             "explanation": explanation,
@@ -533,7 +675,7 @@ CRITICAL:
 """
 
     try:
-        response = client.chat.completions.create(
+        response = _get_groq_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
@@ -557,7 +699,16 @@ CRITICAL:
             "practice_tasks": ["Practice task 1", "Practice task 2"]
         }
 
-    # 2. Build PDF
+    # 2. Route the prepared notes through LangGraph before rendering.
+    data = run_notes_generation_graph(
+        topic,
+        subtopic,
+        domain,
+        lambda _topic, _subtopic, _domain: rag_context,
+        lambda _topic, _subtopic, _domain, _rag_context: data,
+    )
+
+    # 3. Build PDF
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                             leftMargin=2*cm, rightMargin=2*cm,

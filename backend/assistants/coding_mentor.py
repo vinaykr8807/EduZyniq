@@ -6,8 +6,10 @@ import time
 import tracemalloc
 import re
 import shutil
+import sys
 import uuid
 from typing import Dict, Any
+from services.langgraph_pipelines import run_coding_mentor_graph
 
 # For compiled langs we need a REAL dir that Docker Desktop allows.
 # Use the project's own .sandbox folder (inside the workspace) which is on /home — always shared.
@@ -18,7 +20,7 @@ os.makedirs(SANDBOX_DIR, exist_ok=True)
 
 def _docker_available() -> bool:
     try:
-        r = subprocess.run(['docker', '--version'], capture_output=True, timeout=2)
+        r = subprocess.run(['docker', 'info'], capture_output=True, timeout=5)
         return r.returncode == 0
     except Exception:
         return False
@@ -41,8 +43,10 @@ def execute_code_safely(code: str, language: str) -> Dict[str, Any]:
     }
 
     use_docker = _docker_available()
-    if use_docker:
-        results['sandbox_type'] = 'docker'
+    if not use_docker:
+        results['error'] = "Secure Docker sandbox is unavailable. Code execution is disabled."
+        return results
+    results['sandbox_type'] = 'docker'
 
     lang_lower = language.lower()
 
@@ -108,6 +112,9 @@ def execute_code_safely(code: str, language: str) -> Dict[str, Any]:
                     '--network=none',
                     '--memory=256m',
                     '--cpus=0.5',
+                    '--pids-limit=128',
+                    '--cap-drop=ALL',
+                    '--security-opt=no-new-privileges',
                     cfg['image']
                 ] + cfg['docker_cmd']
                 proc = subprocess.Popen(
@@ -121,7 +128,7 @@ def execute_code_safely(code: str, language: str) -> Dict[str, Any]:
                 # Local fallback
                 if lang_lower == 'python':
                     proc = subprocess.Popen(
-                        ['python3', '-c', stdin_code],
+                        [sys.executable, '-c', stdin_code],
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                     )
                 elif lang_lower == 'javascript':
@@ -200,6 +207,9 @@ def execute_code_safely(code: str, language: str) -> Dict[str, Any]:
                     '--network=none',
                     '--memory=256m',
                     '--cpus=0.5',
+                    '--pids-limit=128',
+                    '--cap-drop=ALL',
+                    '--security-opt=no-new-privileges',
                     '-v', f'{run_dir}:/code',
                     cfg['image']
                 ] + docker_run_cmd
@@ -214,14 +224,16 @@ def execute_code_safely(code: str, language: str) -> Dict[str, Any]:
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                 )
 
+            timeout_seconds = 45 if lang_lower == 'go' else 15
+
             try:
-                stdout, stderr = proc.communicate(timeout=15)
+                stdout, stderr = proc.communicate(timeout=timeout_seconds)
                 results['success'] = proc.returncode == 0
                 results['output'] = stdout
                 results['error'] = stderr
             except subprocess.TimeoutExpired:
                 proc.kill()
-                results['error'] = "Execution timeout (15s limit)"
+                results['error'] = f"Execution timeout ({timeout_seconds}s limit)"
 
     except Exception as e:
         results['error'] = str(e)
@@ -257,15 +269,13 @@ def analyze_code_deep(code: str, language: str = "python"):
         return {"bugs": [], "explanation": "API Key missing", "fix": "", "optimized": "", "mistakes": [], "optimization_score": 0}
 
     client = Groq(api_key=api_key)
-    
-    # Run sandbox first
-    exec_results = execute_code_safely(code, language)
 
-    prompt = f"""
+    def analyze_with_groq(code_text: str, lang: str, exec_results: dict[str, Any]) -> dict[str, Any]:
+        prompt = f"""
     You are Coding Mentor AI. Analyze this {language} code.
     
     Code:
-    {code}
+    {code_text}
     
     Execution Context (Actual output from {exec_results['sandbox_type']} sandbox):
     Success: {exec_results['success']}
@@ -299,29 +309,27 @@ def analyze_code_deep(code: str, language: str = "python"):
         }}
     }}
     """
-    
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
-            response_format={"type": "json_object"},
-            stream=False
-        )
-        data = json.loads(chat_completion.choices[0].message.content)
-        # Add the raw sandbox output too
-        data['execution'] = exec_results
-        return data
-    except Exception as e:
-        print(f"Code Analysis Error: {e}")
-        return {
-            "bugs": [],
-            "explanation": f"Mentoring failed: {str(e)}",
-            "fix": "", "optimized": "", "mistakes": [], "optimization_score": 0,
-            "execution": exec_results,
-            "metrics": {
-                 "complexity": exec_results['complexity'],
-                 "time": f"{exec_results['execution_time']}s",
-                 "memory": f"{exec_results['memory_used']} MB",
-                 "sandbox": exec_results['sandbox_type']
+
+        try:
+            chat_completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.3-70b-versatile",
+                response_format={"type": "json_object"},
+                stream=False
+            )
+            return json.loads(chat_completion.choices[0].message.content)
+        except Exception as e:
+            print(f"Code Analysis Error: {e}")
+            return {
+                "bugs": [],
+                "explanation": f"Mentoring failed: {str(e)}",
+                "fix": "", "optimized": "", "mistakes": [], "optimization_score": 0,
+                "metrics": {
+                     "complexity": exec_results['complexity'],
+                     "time": f"{exec_results['execution_time']}s",
+                     "memory": f"{exec_results['memory_used']} MB",
+                     "sandbox": exec_results['sandbox_type']
+                }
             }
-        }
+
+    return run_coding_mentor_graph(code, language, execute_code_safely, analyze_with_groq)

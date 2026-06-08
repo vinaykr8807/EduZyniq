@@ -5,6 +5,14 @@ export default API_BASE_URL;
 export const apiFetch = (url: string, options: RequestInit = {}): Promise<Response> => {
     const headers = new Headers(options.headers || {});
     headers.set('ngrok-skip-browser-warning', 'true');
+    try {
+        const savedUser = localStorage.getItem('eduzyniq_user');
+        const token = savedUser ? JSON.parse(savedUser)?.token : null;
+        if (token && !headers.has('Authorization')) {
+            headers.set('Authorization', `Bearer ${token}`);
+        }
+    } catch {
+        localStorage.removeItem('eduzyniq_user');
+    }
     return fetch(url, { ...options, headers });
 };
-

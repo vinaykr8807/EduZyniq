@@ -106,7 +106,8 @@ CREATE INDEX IF NOT EXISTS idx_coding_sessions_user ON coding_sessions(user_id);
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES 
     ('student-notes', 'student-notes', false, 10485760, ARRAY['application/pdf']),
-    ('resumes', 'resumes', false, 5242880, ARRAY['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'])
+    ('resumes', 'resumes', false, 5242880, ARRAY['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png']),
+    ('rag-vectors', 'rag-vectors', false, 10485760, ARRAY['application/octet-stream', 'application/json'])
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. Storage policies so service_role can upload/read
@@ -119,6 +120,11 @@ DROP POLICY IF EXISTS "Service role all access - resumes" ON storage.objects;
 CREATE POLICY "Service role all access - resumes"
   ON storage.objects FOR ALL
   TO service_role USING (bucket_id = 'resumes') WITH CHECK (bucket_id = 'resumes');
+
+DROP POLICY IF EXISTS "Service role all access - rag-vectors" ON storage.objects;
+CREATE POLICY "Service role all access - rag-vectors"
+  ON storage.objects FOR ALL
+  TO service_role USING (bucket_id = 'rag-vectors') WITH CHECK (bucket_id = 'rag-vectors');
 
 -- =====================================================
 -- VERIFY: Run these SELECT statements to confirm setup

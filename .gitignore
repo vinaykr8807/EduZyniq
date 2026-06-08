@@ -17,6 +17,9 @@ pip-delete-this-directory.txt
 .env.production.local
 backend/.env
 backend/.env.local
+backend/.env*
+!backend/.env.example
+.codex
 
 # Build outputs
 dist/

@@ -490,6 +490,20 @@ select.input-field option, option {
   padding-top: 100px;
 }
 
+@media (max-width: 1100px) {
+  .container {
+    padding: 0 var(--spacing-md);
+    padding-top: 92px;
+  }
+}
+
+@media (max-width: 767px) {
+  .container {
+    padding: 0 var(--spacing-sm);
+    padding-top: 84px;
+  }
+}
+
 .flex        { display: flex; }
 .flex-wrap   { flex-wrap: wrap; }
 .flex-col    { display: flex; flex-direction: column; }
@@ -530,6 +544,26 @@ select.input-field option, option {
 .mobile-hide { display: block; }
 @media (max-width: 768px) {
   .mobile-hide { display: none !important; }
+}
+
+@media (max-width: 1100px) {
+  .coach-grid,
+  .teacher-grid,
+  .interview-room-grid,
+  .report-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .responsive-stack-mobile {
+    grid-template-columns: 1fr !important;
+  }
+
+  .responsive-actions-mobile {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════

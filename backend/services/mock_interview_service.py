@@ -4,6 +4,7 @@ import random
 from groq import Groq
 from services.career_pathfinder import _search_ddg_jobs
 from supabase_client import supabase
+from services.interview_memory_service import build_interview_memory_context, store_interview_evaluations
 
 # ──────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -73,6 +74,12 @@ def _get_user_context(user_email: str) -> dict | None:
             "session": session_res.data[0] if session_res.data else {},
             "past_mocks": mock_res.data or [],
             "profile": profile_res.data[0] if profile_res.data else {},
+            "interview_memory": build_interview_memory_context(
+                user_email,
+                "previous candidate interview answers, weak areas, mistakes, and coaching feedback",
+                supabase,
+                top_k=5,
+            ),
         }
     except Exception as e:
         print(f"Context Fetch Error: {e}")
@@ -126,6 +133,7 @@ def build_mock_plan(role: str, domain: str, extracted_skills: list, user_email: 
     ))
     missing_skills = context["session"].get("missing_skills", []) if context else []
     past_weak = _past_weak_areas(context)
+    interview_memory = context.get("interview_memory", "") if context else ""
 
     # Merge and shuffle skill pool
     random.shuffle(all_skills)
@@ -241,6 +249,7 @@ def generate_mock_question(
     ats_score = (resume_data.get("ats_score", {}).get("total_score") or
                  (context["session"].get("ats_score", {}).get("total_score", "N/A") if context else "N/A"))
     past_weak = _past_weak_areas(context)
+    interview_memory = context.get("interview_memory", "") if context else ""
 
     effective_difficulty = plan_item.get("difficulty", difficulty)
 
@@ -271,6 +280,8 @@ Return ONLY valid JSON:
   "question": "A direct, specific question referencing the candidate's actual project, contextualized for a {role} position.",
   "category": "project",
   "difficulty": "{effective_difficulty}",
+  "question_family": "Project deep dive",
+  "interviewer_focus": ["Technical depth", "Design decisions", "Challenges overcome", "Relevance to role"],
   "expected_key_points": ["Technical depth", "Design decisions", "Challenges overcome", "Relevance to role"]
 }}
 """
@@ -279,6 +290,13 @@ Return ONLY valid JSON:
             return res
 
     # ── Standard/Technical/Behavioral question path ───────────────────────
+    question_family = (
+        "Scenario based" if plan_item["type"] == "scenario"
+        else "Behavioral" if plan_item["type"] == "behavioral"
+        else "Fundamental" if plan_item["type"] == "fundamental"
+        else "Technical"
+    )
+
     prompt = f"""
 You are a senior technical interviewer assessing a candidate for a {role} role in the {domain} domain.
 
@@ -287,6 +305,7 @@ IMPORTANT CONTEXT (STRICTLY FROM RESUME):
 - Projects Built     : {projects_str}
 - Resume ATS Score   : {ats_score}
 - Past Mistakes      : {', '.join(past_weak) or 'None'}
+- Vector Memory      : {interview_memory or 'No FAISS interview memory yet.'}
 
 INTERVIEW STEP:
 - Current Round : {plan_item['type']}
@@ -307,19 +326,15 @@ Return ONLY valid JSON:
   "question": "A direct, technically deep question evaluating them for a {role} while referencing one of their actual projects or listed skills.",
   "category": "{plan_item['type']}",
   "difficulty": "{effective_difficulty}",
+  "question_family": "{question_family}",
+  "interviewer_focus": ["Specific technical detail", "Reasoning", "Impact"],
   "expected_key_points": ["Specific technical detail", "Reasoning", "Impact"]
 }}
 """
     res = _llm(prompt, 0.6)
     if res and "question" in res:
         return res
-    # Fallback
-    return {
-        "question": f"Can you walk me through how you built or designed something using {plan_item['skill']} in one of your projects?",
-        "category": plan_item["type"],
-        "difficulty": effective_difficulty,
-        "expected_key_points": ["Clear explanation", "Design rationale", "Outcome"],
-    }
+    raise RuntimeError("Mock interview question generation failed. No fallback question was used.")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -360,10 +375,15 @@ PROBLEM REQUIREMENTS:
 
 Return ONLY valid JSON:
 {{
+  "problem_title": "Short problem title",
   "question": "Problem title and description including constraints.",
+  "problem_statement": "Main coding problem statement only",
   "category": "coding",
   "topic": "{target_topic}",
   "difficulty": "{difficulty}",
+  "question_family": "Coding",
+  "interviewer_focus": ["Problem understanding", "Correct algorithm", "Time and space complexity", "Edge case handling"],
+  "constraints": ["..."],
   "examples": [
     {{"input": "...", "output": "...", "explanation": "..."}}
   ],
@@ -372,6 +392,7 @@ Return ONLY valid JSON:
   ],
   "hints": ["...", "..."],
   "expected_key_points": ["Algorithm approach", "Time complexity", "Space complexity", "Edge cases"],
+  "starter_template_note": "Starter function signature shown below should be used as the base.",
   "function_signature": {{
     "python": "def solve(input_data):\\n    pass",
     "javascript": "function solve(inputData) {{\\n\\n}}",
@@ -385,27 +406,7 @@ Return ONLY valid JSON:
         res["type"] = "coding"
         return res
 
-    # Fallback problem
-    return {
-        "question": "Given an array of integers, return the indices of the two numbers that add up to a target sum. Assume exactly one solution exists.",
-        "category": "coding",
-        "difficulty": difficulty,
-        "examples": [
-            {"input": "[2,7,11,15], target=9", "output": "[0,1]", "explanation": "nums[0]+nums[1]=9"},
-            {"input": "[3,2,4], target=6", "output": "[1,2]", "explanation": "nums[1]+nums[2]=6"},
-        ],
-        "test_cases": [
-            {"input": "[2,7,11,15]\n9", "expected_output": "[0, 1]"},
-            {"input": "[3,2,4]\n6", "expected_output": "[1, 2]"},
-            {"input": "[3,3]\n6", "expected_output": "[0, 1]"},
-        ],
-        "hints": ["Use a hashmap for O(n) solution", "Track complement = target - num"],
-        "expected_key_points": ["Hash map approach", "O(n) time", "Handles duplicates"],
-        "function_signature": {
-            "python": "def solve(nums, target):\n    # your code here\n    pass",
-            "javascript": "function solve(nums, target) {\n  // your code here\n}",
-        },
-    }
+    raise RuntimeError("Coding challenge generation failed. No fallback coding problem was used.")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -568,7 +569,8 @@ TEST EXECUTION RESULTS:
 """
 
     prompt = f"""
-You are an expert technical interviewer evaluating a {role}'s coding answer.
+You are a senior software engineer and technical interviewer evaluating a {role}'s coding round.
+Give feedback like a professional code review plus interview debrief: specific, practical, and comprehensive.
 
 PROBLEM:
 {question}
@@ -586,6 +588,7 @@ Evaluate the candidate holistically. Consider:
 - Algorithm choice & time/space complexity
 - Code readability & style
 - Quality of their verbal approach explanation
+- Whether the candidate explained tradeoffs, edge cases, and why the approach is appropriate
 
 Return ONLY valid JSON:
 {{
@@ -593,8 +596,19 @@ Return ONLY valid JSON:
   "correctness_score": <1-10>,
   "approach_score": <1-10>,
   "code_quality_score": <1-10>,
-  "strengths": "...",
-  "weaknesses": "...",
+  "senior_feedback": "2-4 paragraph senior-engineer debrief covering approach, code quality, missed reasoning, and interview readiness.",
+  "strengths": "Specific strengths with evidence from approach/code/tests.",
+  "weaknesses": "Specific weaknesses with evidence from approach/code/tests.",
+  "mistakes_made": ["Specific mistake 1", "Specific mistake 2"],
+  "skill_gaps": ["Skill gap 1", "Skill gap 2"],
+  "improvement_areas": ["Area to improve 1", "Area to improve 2"],
+  "interviewer_expectation_missed": ["Expectation missed 1", "Expectation missed 2"],
+  "interviewer_expected_to_hear": ["Expected explanation point 1", "Expected explanation point 2"],
+  "answer_coverage": {{
+    "covered": ["What the candidate handled well"],
+    "partially_covered": ["What was present but under-explained"],
+    "missed": ["What should have been discussed or implemented"]
+  }},
   "optimal_solution": "Brief description of the best approach",
   "improved_code": "A clean, optimal {language} solution",
   "advice": "Specific, actionable advice",
@@ -609,70 +623,123 @@ Return ONLY valid JSON:
             res["test_execution"] = exec_summary
         return res
 
-    return {
-        "overall_score": 5,
-        "correctness_score": exec_summary["score_pct"] // 10 if exec_summary else 5,
-        "approach_score": 5,
-        "code_quality_score": 5,
-        "strengths": "Attempted the problem.",
-        "weaknesses": "Needs more practice.",
-        "optimal_solution": "Use a hash map for O(n) lookup.",
-        "improved_code": "# See editorial",
-        "advice": "Focus on edge cases and complexity analysis.",
-        "time_complexity": "O(n)",
-        "space_complexity": "O(n)",
-        "test_execution": exec_summary or {},
-    }
+    raise RuntimeError("Coding answer evaluation failed. No fallback score or feedback was used.")
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # Standard Answer Evaluator
 # ──────────────────────────────────────────────────────────────────────────
 
-def evaluate_mock_answer(question: str, answer: str, role: str, domain: str) -> dict:
+def evaluate_mock_answer(
+    question: str,
+    answer: str,
+    role: str,
+    domain: str,
+    expected_key_points: list[str] | None = None,
+    interviewer_focus: list[str] | None = None,
+    live_metrics: dict | None = None,
+    speech_feedback: dict | None = None,
+) -> dict:
+    expected_key_points = expected_key_points or []
+    interviewer_focus = interviewer_focus or []
+    live_metrics = live_metrics or {}
+    speech_feedback = speech_feedback or {}
     prompt = f"""
-Evaluate this candidate's interview answer for a {role} ({domain}) position.
+You are a senior developer and hiring-panel interviewer. Evaluate this candidate's interview answer for a {role} ({domain}) position.
+
+Your feedback must feel like a professional debrief from a senior engineer: analytical, specific, comprehensive, and helpful. Do not sound robotic.
 
 Question: {question}
 Answer  : {answer}
 
-Be constructive and fair. Judge depth of understanding, communication, and practical insight.
+Interviewer expected the answer to cover these points/hints:
+{json.dumps(expected_key_points, indent=2)}
+
+Interviewer focus areas:
+{json.dumps(interviewer_focus, indent=2)}
+
+Live delivery metrics, if available:
+{json.dumps(live_metrics, indent=2)}
+
+Speech feedback, if available:
+{json.dumps(speech_feedback, indent=2)}
+
+Evaluate in four stages:
+1. Analyst: compare what the candidate said against the expected coverage.
+2. Explainer: explain why gaps matter in a real interview.
+3. Writer: rewrite the answer in a polished, interview-ready form.
+4. Coach: give concrete next actions for content and spoken delivery.
+
+Scoring guidance:
+- Technical accuracy should reflect correctness and depth, not confidence.
+- Communication should reflect structure, clarity, specificity, and whether the spoken answer covered the expected hints.
+- Penalize vague answers that do not mention tradeoffs, examples, metrics, implementation details, or role-relevant reasoning.
+- If the answer is short, say exactly what should have been added.
 
 Return ONLY valid JSON:
 {{
   "overall_score": <1-10>,
   "technical_accuracy": <1-10>,
   "communication": <1-10>,
-  "strengths": "...",
-  "weaknesses": "...",
-  "improved_answer": "How a strong {role} would answer this",
-  "advice": "Specific actionable advice",
-  "weak_areas": ["topic1", "topic2"]
+  "senior_feedback": "A detailed senior-interviewer debrief in 2-4 paragraphs. Mention whether the spoken answer covered the expected hints.",
+  "answer_coverage": {{
+    "covered": ["Expected point that was covered"],
+    "partially_covered": ["Expected point that was touched but not developed"],
+    "missed": ["Expected point that was missing"]
+  }},
+  "strengths": "Specific strengths with evidence from the candidate answer.",
+  "weaknesses": "Specific weaknesses with evidence from the candidate answer.",
+  "improved_answer": "A polished answer the candidate could speak in an interview. Make it concrete and role-relevant.",
+  "advice": "Specific actionable advice for the next attempt.",
+  "delivery_feedback": {{
+    "speaking_summary": "How the candidate sounded while speaking, based on metrics if provided.",
+    "pace": "specific pacing feedback",
+    "clarity": "specific clarity feedback",
+    "confidence": "specific confidence/body language feedback"
+  }},
+  "interviewer_expected_to_hear": ["Concrete item interviewer expected"],
+  "weak_areas": ["topic1", "topic2"],
+  "mistakes_made": ["Specific mistake 1", "Specific mistake 2"],
+  "skill_gaps": ["Skill gap 1", "Skill gap 2"],
+  "improvement_areas": ["Area to improve 1", "Area to improve 2"],
+  "interviewer_expectation_missed": ["Expectation missed 1", "Expectation missed 2"]
 }}
 """
     res = _llm(prompt, 0.25)
     if res:
         return res
-    return {
-        "overall_score": 5, "technical_accuracy": 5, "communication": 5,
-        "strengths": "Provided an answer.",
-        "weaknesses": "Answer lacked depth.",
-        "improved_answer": "Structure your answer using STAR method.",
-        "advice": "Practice articulating technical decisions out loud.",
-        "weak_areas": [],
-    }
+    raise RuntimeError("Mock answer evaluation failed. No fallback score or feedback was used.")
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # Persist mock session for adaptive learning
 # ──────────────────────────────────────────────────────────────────────────
 
-def save_mock_session(user_email: str, role: str, domain: str, language: str, evaluations: list) -> None:
+def save_mock_session(
+    user_email: str,
+    role: str,
+    domain: str,
+    language: str,
+    evaluations: list,
+    room_summary: dict | None = None,
+    report: dict | None = None,
+    expected_question_count: int | None = None,
+) -> bool:
     """Save aggregated mock session to Supabase for future adaptation."""
     try:
+        completed_count = len(evaluations)
+        required_count = expected_question_count or completed_count
+        is_completed = required_count > 0 and completed_count >= required_count
+        if not is_completed:
+            print(
+                f"Mock session save skipped: incomplete session "
+                f"({completed_count}/{required_count} answered)."
+            )
+            return False
+
         u_res = supabase.table("users").select("id").eq("email", user_email).execute()
         if not u_res.data:
-            return
+            return False
         user_id = u_res.data[0]["id"]
 
         # Aggregate weak areas across all evals
@@ -683,15 +750,56 @@ def save_mock_session(user_email: str, role: str, domain: str, language: str, ev
         avg_score = round(
             sum(ev.get("overall_score", 5) for ev in evaluations) / max(len(evaluations), 1), 1
         )
+        summary = dict(room_summary or {})
+        session_report = dict(report or {})
+        summary["is_completed"] = True
+        summary["completed_questions"] = completed_count
+        summary["expected_questions"] = required_count
+        session_report["is_completed"] = True
+        session_report["completed_questions"] = completed_count
+        session_report["expected_questions"] = required_count
+        metrics = summary.get("metrics", {})
+        readiness_score = float(
+            summary.get("readiness_score")
+            or session_report.get("readiness_score")
+            or round(avg_score * 10, 1)
+        )
 
         supabase.table("mock_interview_sessions").insert({
             "user_id": user_id,
             "role": role,
             "domain": domain,
             "language": language,
+            "session_kind": summary.get("session_kind", "live_room" if summary else "classic"),
             "avg_score": avg_score,
+            "readiness_score": readiness_score,
+            "eye_contact_score": float(metrics.get("eye_contact", 0) or 0),
+            "confidence_score": float(metrics.get("confidence", 0) or 0),
+            "speech_clarity_score": float(metrics.get("speech_clarity", 0) or 0),
+            "body_language_score": float(metrics.get("body_language", 0) or 0),
+            "posture_score": float(metrics.get("posture", 0) or 0),
+            "expression_score": float(metrics.get("expression", 0) or 0),
+            "communication_score": float(metrics.get("communication", 0) or 0),
             "weak_areas": list(set(weak_areas)),
             "num_questions": len(evaluations),
+            "presence_alerts": summary.get("presence_alerts", []),
+            "room_summary": summary,
+            "report": session_report,
         }).execute()
+
+        try:
+            memory_result = store_interview_evaluations(
+                user_email,
+                role,
+                domain,
+                language,
+                evaluations,
+                supabase,
+            )
+            print(f"Interview FAISS memory updated: {memory_result}")
+        except Exception as vector_error:
+            print(f"Interview FAISS memory save error: {vector_error}")
+        return True
     except Exception as e:
         print(f"Save mock session error: {e}")
+        return False

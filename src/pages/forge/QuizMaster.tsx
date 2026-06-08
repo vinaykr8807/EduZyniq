@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import API_BASE_URL, { apiFetch } from '../../config';
 import { CURRICULUM_DATA, type Roadmap } from '../../data/curriculumData';
 import { KnowledgeGraph } from '../../components/KnowledgeGraph';
+import { useResponsive } from '../../hooks/useResponsive';
 interface Question {
     question: string;
     options: string[];
@@ -20,6 +21,8 @@ const QUIZ_MODES = [
 ];
 
 export const QuizMaster = ({ onComplete }: any) => {
+    const { isMobile, isTablet } = useResponsive();
+    const isCompact = isMobile || isTablet;
     const [viewMode, setViewMode] = useState<'custom' | 'curriculum'>('curriculum');
     const [quizMode, setQuizMode] = useState('standard');
     const [config, setConfig] = useState({ subject: 'Full Stack Development', topic: 'React Context API', difficulty: 'Medium' });
@@ -349,7 +352,9 @@ export const QuizMaster = ({ onComplete }: any) => {
                           <div className="grid-2 gap-md mt-xl">
                              {teachResult.visual_aid && (
                                 <div className="glass-card" style={{ padding: '0.5rem', gridColumn: 'span 2' }}>
-                                    <img src={teachResult.visual_aid} alt="Reference" style={{ width: '100%', height: '250px', objectFit: 'cover', borderRadius: '12px' }} />
+                                    <div style={{ width: '100%', height: '250px', borderRadius: '12px', overflow: 'hidden', background: 'rgba(255,255,255,0.96)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <img src={teachResult.visual_aid} alt="Reference" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12px', display: 'block' }} />
+                                    </div>
                                     <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '4px' }}>AI REFERENCE VISUAL</p>
                                 </div>
                              )}
@@ -534,7 +539,7 @@ export const QuizMaster = ({ onComplete }: any) => {
             </header>
 
             {!quiz ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(350px, 450px) 1fr', gap: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'minmax(350px, 450px) 1fr', gap: '2rem' }}>
                     <div className="glass-card flex-col gap-lg" style={{ padding: '2rem' }}>
                         <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>⚙️ Configure Session</h3>
 
@@ -629,7 +634,7 @@ export const QuizMaster = ({ onComplete }: any) => {
                     </div>
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '1fr 360px', gap: '2rem' }}>
                     <div className="flex-col gap-lg">
                         <div className="glass-card flex-col gap-xl" style={{ padding: '2.5rem' }}>
                             <div className="flex justify-between items-center">
@@ -645,7 +650,9 @@ export const QuizMaster = ({ onComplete }: any) => {
                                 <h3 style={{ fontSize: '1.4rem', lineHeight: 1.4, fontWeight: 700 }}>{quiz[currentIndex].question}</h3>
                                 {quiz[currentIndex].image_url && (
                                     <div className="glass-card" style={{ padding: '0.5rem', marginBottom: '1rem' }}>
-                                        <img src={quiz[currentIndex].image_url} alt="Problem Visualization" style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: '8px' }} />
+                                        <div style={{ width: '100%', height: '400px', borderRadius: '8px', overflow: 'hidden', background: 'rgba(255,255,255,0.96)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <img src={quiz[currentIndex].image_url} alt="Problem Visualization" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px', display: 'block' }} />
+                                        </div>
                                     </div>
                                 )}
                                 {quiz[currentIndex].question.includes('```') && (
@@ -799,4 +806,3 @@ export const QuizMaster = ({ onComplete }: any) => {
         </div>
     );
 };
-

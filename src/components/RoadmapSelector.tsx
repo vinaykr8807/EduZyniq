@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CURRICULUM_DATA, type Roadmap } from '../data/curriculumData';
+import API_BASE_URL, { apiFetch } from '../config';
 
 interface RoadmapSelectorProps {
     onSelect?: (roadmap: Roadmap) => void;
@@ -10,7 +11,7 @@ export const RoadmapSelector = ({ onSelect }: RoadmapSelectorProps) => {
 
     const handleDownloadPDF = async (roadmap: Roadmap) => {
         try {
-            const response = await fetch('http://127.0.0.1:8000/download-roadmap-pdf', {
+            const response = await apiFetch(`${API_BASE_URL}/download-roadmap-pdf`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(roadmap)

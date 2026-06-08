@@ -4,6 +4,7 @@ from typing import Optional
 from groq import Groq
 import requests
 from services.wikipedia_service import get_wikipedia_image
+from services.langgraph_pipelines import run_quiz_feedback_graph, run_quiz_generation_graph
 
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
 
@@ -15,6 +16,49 @@ def get_image(query, page=1):
     except Exception as e:
         print(f"Image Fetch Error: {e}")
         return None
+
+
+def _extract_questions(data):
+    questions = []
+    for key in ["quiz", "questions", "data", "questions_list"]:
+        if key in data and isinstance(data[key], list):
+            questions = data[key]
+            break
+
+    if not questions:
+        for val in data.values():
+            if isinstance(val, list) and len(val) > 0:
+                questions = val
+                break
+
+    if not questions and isinstance(data, list):
+        questions = data
+    return questions
+
+
+def _calculate_quiz_mastery(results: list) -> dict[str, float]:
+    total = len(results)
+    correct_count = sum(1 for r in results if r.get('is_correct'))
+    overall_score = (correct_count / total) if total > 0 else 0
+
+    categories = {"Theory": 0, "Logic": 0, "Systems": 0, "Implementation": 0}
+    cat_counts = {"Theory": 0, "Logic": 0, "Systems": 0, "Implementation": 0}
+
+    for r in results:
+        tag = r.get('topic_tag', '').lower()
+        target = "Theory"
+        if any(x in tag for x in ['code', 'syntax', 'impl', 'deploy', 'writing', 'completion']): target = "Implementation"
+        elif any(x in tag for x in ['logic', 'problem', 'algorithm', 'math', 'reasoning']): target = "Logic"
+        elif any(x in tag for x in ['system', 'arch', 'design', 'scaling', 'infra']): target = "Systems"
+
+        cat_counts[target] += 1
+        if r.get('is_correct'):
+            categories[target] += 1
+
+    return {
+        key: (value / cat_counts[key]) if cat_counts[key] > 0 else overall_score
+        for key, value in categories.items()
+    }
 
 def generate_dynamic_quiz(subject: str, topic: str, difficulty: str, mode: str = "standard", domain: Optional[str] = None, subtopic: Optional[str] = None):
     api_key = os.getenv("GROQ_API_KEY")
@@ -77,44 +121,30 @@ def generate_dynamic_quiz(subject: str, topic: str, difficulty: str, mode: str =
     - Focus on finding INTERNAL diagrams.
     """
     
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
-            response_format={"type": "json_object"},
-            temperature=0.6,
-            max_tokens=3000
-        )
-        
-        raw_content = chat_completion.choices[0].message.content
-        data = json.loads(raw_content)
-        
-        questions = []
-        for key in ["quiz", "questions", "data", "questions_list"]:
-            if key in data and isinstance(data[key], list):
-                questions = data[key]
-                break
-        
-        if not questions:
-            for val in data.values():
-                if isinstance(val, list) and len(val) > 0:
-                    questions = val
-                    break
-        
-        if not questions and isinstance(data, list):
-            questions = data
+    def generate_node(_state):
+        try:
+            chat_completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.3-70b-versatile",
+                response_format={"type": "json_object"},
+                temperature=0.6,
+                max_tokens=3000
+            )
+            raw_content = chat_completion.choices[0].message.content
+            return _extract_questions(json.loads(raw_content))
+        except Exception as e:
+            print(f"Quiz Generation Error: {e}")
+            return []
 
-        # Process Visuals
+    def enrich_visuals(questions, state):
         for q in questions:
             if "visual_query" in q:
                 q["image_url"] = get_image(q["visual_query"])
-            elif mode in ["visual", "image_based"]:
-                q["image_url"] = get_image(f"{subject} {topic} {q.get('topic_tag', '')}")
-                
+            elif state.get("mode") in ["visual", "image_based"]:
+                q["image_url"] = get_image(f"{state.get('subject')} {state.get('topic')} {q.get('topic_tag', '')}")
         return questions
-    except Exception as e:
-        print(f"Quiz Generation Error: {e}")
-        return []
+
+    return run_quiz_generation_graph(subject, topic, difficulty, mode, domain, subtopic, generate_node, enrich_visuals)
 
 def generate_quiz_feedback(results: list, subject: str, topic: str):
     """
@@ -124,34 +154,8 @@ def generate_quiz_feedback(results: list, subject: str, topic: str):
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key: return {"gaps": ["General practice needed"], "plan": ["Review foundational concepts"]}
     
-    # Pre-calculate raw performance for mapping
-    total = len(results)
-    correct_count = sum(1 for r in results if r.get('is_correct'))
-    overall_score = (correct_count / total) if total > 0 else 0
-    
-    # Category mapping hint
-    categories = {"Theory": 0, "Logic": 0, "Systems": 0, "Implementation": 0}
-    cat_counts = {"Theory": 0, "Logic": 0, "Systems": 0, "Implementation": 0}
-    
-    for r in results:
-        tag = r.get('topic_tag', '').lower()
-        # Map tag to one of the 4 buckets
-        target = "Theory"
-        if any(x in tag for x in ['code', 'syntax', 'impl', 'deploy', 'writing', 'completion']): target = "Implementation"
-        elif any(x in tag for x in ['logic', 'problem', 'algorithm', 'math', 'reasoning']): target = "Logic"
-        elif any(x in tag for x in ['system', 'arch', 'design', 'scaling', 'infra']): target = "Systems"
-        
-        cat_counts[target] += 1
-        if r.get('is_correct'):
-            categories[target] += 1
-            
-    # Calculate percentages per category
-    cat_mastery = {}
-    for k, v in categories.items():
-        count = cat_counts[k]
-        cat_mastery[k] = (v / count) if count > 0 else overall_score
-
-    prompt = f"""
+    def feedback_node(feedback_results, feedback_subject, feedback_topic, cat_mastery):
+        prompt = f"""
     Analyze these {subject} ({topic}) quiz results for a student.
     RAW PERFORMANCE METRICS (Use these as the base for the knowledge_graph):
     {json.dumps(cat_mastery)}
@@ -175,33 +179,34 @@ def generate_quiz_feedback(results: list, subject: str, topic: str):
     CRITICAL: "gaps" and "plan" MUST ALWAYS BE ARRAYS. For example: {{"gaps": ["Issue 1", "Issue 2"], "plan": ["Step 1"]}}.
     Return ONLY a valid JSON object.
     """
-    
-    client = Groq(api_key=api_key)
-    try:
-        res = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are a master technical mentor. Your job is to translate raw quiz data into a visual mastery graph and actionable plan."},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            response_format={"type": "json_object"}
-        )
-        data = json.loads(res.choices[0].message.content)
-        
-        # Robustness check to prevent frontend .map() crashes
-        if "gaps" in data and isinstance(data["gaps"], str):
-             data["gaps"] = [data["gaps"]]
-        if "plan" in data and isinstance(data["plan"], str):
-             data["plan"] = [data["plan"]]
-        if "gaps" not in data or not isinstance(data["gaps"], list):
-             data["gaps"] = ["General review of foundational concepts recommended."]
-        if "plan" not in data or not isinstance(data["plan"], list):
-             data["plan"] = ["Review the explanation for missed questions.", "Practice similar problems.", "Deepen understanding of core principles."]
-             
-        return data
-    except Exception as e:
-        print(f"Feedback AI Error: {e}")
-        return {"gaps": ["Error analyzing gaps"], "plan": ["Review foundational concepts"]}
+
+        client = Groq(api_key=api_key)
+        try:
+            res = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "You are a master technical mentor. Your job is to translate raw quiz data into a visual mastery graph and actionable plan."},
+                    {"role": "user", "content": prompt}
+                ],
+                model="llama-3.3-70b-versatile",
+                response_format={"type": "json_object"}
+            )
+            data = json.loads(res.choices[0].message.content)
+
+            if "gaps" in data and isinstance(data["gaps"], str):
+                 data["gaps"] = [data["gaps"]]
+            if "plan" in data and isinstance(data["plan"], str):
+                 data["plan"] = [data["plan"]]
+            if "gaps" not in data or not isinstance(data["gaps"], list):
+                 data["gaps"] = ["General review of foundational concepts recommended."]
+            if "plan" not in data or not isinstance(data["plan"], list):
+                 data["plan"] = ["Review the explanation for missed questions.", "Practice similar problems.", "Deepen understanding of core principles."]
+
+            return data
+        except Exception as e:
+            print(f"Feedback AI Error: {e}")
+            return {"gaps": ["Error analyzing gaps"], "plan": ["Review foundational concepts"]}
+
+    return run_quiz_feedback_graph(results, subject, topic, _calculate_quiz_mastery, feedback_node)
 
 def evaluate_student_explanation(topic: str, explanation: str, subject: str):
     """

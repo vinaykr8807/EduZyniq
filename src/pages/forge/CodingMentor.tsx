@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useEduZyniq } from '../../hooks/useEduZyniq';
+import { useResponsive } from '../../hooks/useResponsive';
+import API_BASE_URL, { apiFetch } from '../../config';
 
-const API = 'http://127.0.0.1:8000';
+const API = API_BASE_URL;
 
 const LANG_CONFIG: Record<string, { label: string; ext: string; icon: string; template: string }> = {
     python:     { label: 'Python 3.11',  ext: 'app.py',    icon: '🐍', template: 'print("Hello EduZyniq!")' },
@@ -21,6 +23,8 @@ interface TestCase { input: string; expected: string; actual?: string; passed?: 
 interface Reference { source: 'github' | 'stackoverflow'; title?: string; repo?: string; url: string; content: string; }
 
 export const CodingMentor = ({ onComplete }: any) => {
+    const { isMobile, isTablet } = useResponsive();
+    const isCompact = isMobile || isTablet;
     // ── Core State ──────────────────────────────
     const [language, setLanguage] = useState('python');
     const [problemTitles, setProblemTitles] = useState<string[]>([]);
@@ -67,7 +71,7 @@ export const CodingMentor = ({ onComplete }: any) => {
         setReferences([]);
         setEnhancedCode(null);
 
-        fetch(`${API}/codex/problems?language=${language}`)
+        apiFetch(`${API}/codex/problems?language=${language}`)
             .then(r => r.json())
             .then(d => {
                 setProblemTitles(d.titles || []);
@@ -86,7 +90,7 @@ export const CodingMentor = ({ onComplete }: any) => {
                 const fd = new FormData();
                 fd.append('code', codeRef.current);
                 fd.append('language', language);
-                const r = await fetch(`${API}/codex/analyze-lines`, { method: 'POST', body: fd });
+                const r = await apiFetch(`${API}/codex/analyze-lines`, { method: 'POST', body: fd });
                 const d = await r.json();
                 setLineResults(d.lines || []);
 
@@ -94,7 +98,7 @@ export const CodingMentor = ({ onComplete }: any) => {
                 const fd2 = new FormData();
                 fd2.append('problem_desc', problemDesc);
                 fd2.append('code', codeRef.current.slice(0, 800));
-                const r2 = await fetch(`${API}/codex/check-alignment`, { method: 'POST', body: fd2 });
+                const r2 = await apiFetch(`${API}/codex/check-alignment`, { method: 'POST', body: fd2 });
                 const d2 = await r2.json();
                 setAlignment(d2);
             } catch {}
@@ -115,7 +119,7 @@ export const CodingMentor = ({ onComplete }: any) => {
         fd.append('code', code);
         fd.append('language', language);
         try {
-            const r = await fetch(`${API}/execute-code`, { method: 'POST', body: fd });
+            const r = await apiFetch(`${API}/execute-code`, { method: 'POST', body: fd });
             setExecution(await r.json());
         } catch (e) { console.error(e); }
         setIsExecuting(false);
@@ -129,7 +133,7 @@ export const CodingMentor = ({ onComplete }: any) => {
         fd.append('code', code);
         fd.append('language', language);
         try {
-            const r = await fetch(`${API}/analyze-code`, { method: 'POST', body: fd });
+            const r = await apiFetch(`${API}/analyze-code`, { method: 'POST', body: fd });
             const d = await r.json();
             setAnalysis(d);
             if (d.execution) setExecution(d.execution);
@@ -147,7 +151,7 @@ export const CodingMentor = ({ onComplete }: any) => {
         fd.append('problem_desc', problemDesc);
         fd.append('language', language);
         try {
-            const r = await fetch(`${API}/codex/generate-tests`, { method: 'POST', body: fd });
+            const r = await apiFetch(`${API}/codex/generate-tests`, { method: 'POST', body: fd });
             const d = await r.json();
             setTestCases(d.test_cases || []);
         } catch (e) { console.error(e); }
@@ -162,7 +166,7 @@ export const CodingMentor = ({ onComplete }: any) => {
         fd.append('code', code.slice(0, 600));
         fd.append('language', language);
         try {
-            const r = await fetch(`${API}/codex/references`, { method: 'POST', body: fd });
+            const r = await apiFetch(`${API}/codex/references`, { method: 'POST', body: fd });
             const d = await r.json();
             setReferences([...(d.github || []), ...(d.stackoverflow || [])]);
         } catch (e) { console.error(e); }
@@ -179,7 +183,7 @@ export const CodingMentor = ({ onComplete }: any) => {
         fd.append('problem_desc', problemDesc);
         fd.append('language', language);
         try {
-            const r = await fetch(`${API}/codex/enhance`, { method: 'POST', body: fd });
+            const r = await apiFetch(`${API}/codex/enhance`, { method: 'POST', body: fd });
             const d = await r.json();
             setEnhancedCode(d);
         } catch (e) { console.error(e); }
@@ -196,7 +200,7 @@ export const CodingMentor = ({ onComplete }: any) => {
         if ((profile as any)?.email) fd.append('user_email', (profile as any).email);
         
         try {
-            const r = await fetch(`${API}/codex/compare`, { method: 'POST', body: fd });
+            const r = await apiFetch(`${API}/codex/compare`, { method: 'POST', body: fd });
             const d = await r.json();
             setCompareResults(d);
         } catch (e) { console.error(e); }
@@ -368,7 +372,7 @@ export const CodingMentor = ({ onComplete }: any) => {
 
                 {/* ── TAB: Editor ── */}
                 {activeTab === 'editor' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }} className="teacher-grid">
+                    <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '1fr 320px', gap: '1.5rem' }} className="teacher-grid">
                         {/* Code editor */}
                         <div className="flex-col gap-md">
                             {codeLocked && (
@@ -456,7 +460,7 @@ export const CodingMentor = ({ onComplete }: any) => {
 
                                 {/* Summary Counters */}
                                 {lineResults.length > 0 && (
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
                                         {[['✅ OK', okLines, '#27c93f'], ['⚠️ Warn', warnLines, '#ffbd2e'], ['❌ Error', errLines, '#ff5f56']].map(([lbl, cnt, clr]) => (
                                             <div key={lbl as string} style={{ textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '6px', padding: '0.45rem' }}>
                                                 <div style={{ fontSize: '1rem', fontWeight: 900, color: clr as string }}>{cnt as number}</div>
@@ -492,7 +496,7 @@ export const CodingMentor = ({ onComplete }: any) => {
                             {execution && (
                                 <div className="glass-card" style={{ padding: '1.25rem' }}>
                                     <h4 style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Last Run</h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                                         {[
                                             ['Status', execution.success ? '✅ Pass' : '❌ Fail'],
                                             ['Runtime', `${execution.execution_time}s`],
@@ -574,7 +578,7 @@ export const CodingMentor = ({ onComplete }: any) => {
                                     </div>
                                 )}
                                 {analysis.metrics && (
-                                    <div className="glass-card" style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+                                    <div className="glass-card" style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '0.75rem' }}>
                                         {Object.entries(analysis.metrics).map(([k, v]) => (
                                             <div key={k} style={{ textAlign: 'center' }}>
                                                 <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>{k}</div>
@@ -627,7 +631,7 @@ export const CodingMentor = ({ onComplete }: any) => {
                                     <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>Test {i + 1}</span>
                                     {tc.passed !== undefined && <span style={{ fontSize: '0.75rem', color: tc.passed ? '#27c93f' : '#ff5f56' }}>{tc.passed ? '✅ PASSED' : '❌ FAILED'}</span>}
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '0.75rem' }}>
                                     <div>
                                         <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800 }}>INPUT</div>
                                         <code style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{tc.input}</code>
@@ -699,9 +703,11 @@ export const CodingMentor = ({ onComplete }: any) => {
                                     <div className="glass-card fade-in" style={{ padding: '1.5rem', marginTop: '0.5rem' }}>
                                         <h4 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '1.5rem', color: 'var(--primary-400)', display: 'flex', justifyContent: 'space-between' }}>
                                             <span>⚡ Code Optimization Results</span>
-                                            <span style={{ color: 'var(--accent-green)', fontSize: '0.7rem', padding: '2px 8px', background: 'rgba(39,201,63,0.1)', borderRadius: '12px' }}>✓ Saved to DB</span>
+                                            <span style={{ color: compareResults[1]?.saved_to_supabase ? 'var(--accent-green)' : 'var(--accent-orange)', fontSize: '0.7rem', padding: '2px 8px', background: compareResults[1]?.saved_to_supabase ? 'rgba(39,201,63,0.1)' : 'rgba(245,158,11,0.1)', borderRadius: '12px' }}>
+                                                {compareResults[1]?.saved_to_supabase ? '✓ Saved to Supabase' : 'Not saved to Supabase'}
+                                            </span>
                                         </h4>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '1.5rem' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)', gap: '1.5rem' }}>
                                             {compareResults.map((res: any, i: number) => {
                                                 const timeMax = Math.max(...compareResults.map(r => r.time || 0.001));
                                                 const memMax = Math.max(...compareResults.map(r => r.memory || 1));

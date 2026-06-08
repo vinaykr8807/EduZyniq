@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import type { StudentProfile } from '../types';
+import API_BASE_URL, { apiFetch } from '../config';
 
 interface ProfileDialogProps {
     onSave: (profile: StudentProfile) => void;
     onClose: () => void;
     title?: string;
+    initialProfile?: StudentProfile | null;
 }
 
-export const ProfileDialog: React.FC<ProfileDialogProps> = ({ onSave, onClose, title = "Personalize Your AI" }) => {
+export const ProfileDialog: React.FC<ProfileDialogProps> = ({ onSave, onClose, title = "Personalize Your AI", initialProfile = null }) => {
     const [profile, setProfile] = useState<StudentProfile>({
-        degree: '',
-        branch: '',
-        year: '',
-        domain: '',
-        skills: []
+        degree: initialProfile?.degree || '',
+        branch: initialProfile?.branch || '',
+        year: initialProfile?.year || '',
+        domain: initialProfile?.domain || '',
+        skills: initialProfile?.skills || []
     });
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ onSave, onClose, t
         if (user.email) formData.append('user_email', user.email);
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/upload-resume', {
+            const response = await apiFetch(`${API_BASE_URL}/upload-resume`, {
                 method: 'POST',
                 body: formData,
             });

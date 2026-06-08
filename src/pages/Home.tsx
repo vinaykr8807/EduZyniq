@@ -1,6 +1,10 @@
 import { Link } from 'react-router-dom';
+import { useResponsive } from '../hooks/useResponsive';
 
 export const Home = () => {
+    const { isMobile, isTablet } = useResponsive();
+    const isCompact = isMobile || isTablet;
+
     return (
         <div className="fade-in" style={{ background: 'var(--bg-primary)', minHeight: '100vh', paddingBottom: '0', transition: 'background 0.4s ease' }}>
             {/* 1. 🚀 HERO SECTION */}
@@ -10,7 +14,7 @@ export const Home = () => {
                 position: 'relative',
                 overflow: 'hidden'
             }}>
-                <div className="container" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', alignItems: 'center', gap: '4rem' }}>
+                <div className="container responsive-stack-mobile" style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '1.2fr 1fr', alignItems: 'center', gap: isMobile ? '2rem' : '4rem' }}>
                     <div>
                         <div style={{
                             display: 'inline-block',
@@ -49,7 +53,7 @@ export const Home = () => {
                         }}>
                             An intelligent ecosystem for the modern engineer. 47.2% faster skill acquisition through AI-driven curriculum synthesis.
                         </p>
-                        <div style={{ display: 'flex', gap: '1rem' }}>
+                        <div className="responsive-actions-mobile" style={{ display: 'flex', gap: '1rem' }}>
                             <Link to="/assistant" className="btn btn-primary" style={{
                                 padding: '1rem 2.5rem',
                                 borderRadius: '12px',
@@ -74,14 +78,14 @@ export const Home = () => {
                     {/* Right Side Visual */}
                     <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
                          <div style={{
-                             width: '450px', height: '450px',
+                             width: isMobile ? '280px' : isTablet ? '360px' : '450px', height: isMobile ? '280px' : isTablet ? '360px' : '450px',
                              background: 'radial-gradient(circle, rgba(0,210,220,0.1) 0%, transparent 70%)',
                              borderRadius: '50%',
                              display: 'flex', alignItems: 'center', justifyContent: 'center',
                              position: 'relative'
                          }}>
                              <div style={{
-                                 width: '180px', height: '180px',
+                                 width: isMobile ? '120px' : '180px', height: isMobile ? '120px' : '180px',
                                  background: 'var(--bg-tertiary)',
                                  borderRadius: '50%',
                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -96,7 +100,7 @@ export const Home = () => {
             </section>
 
             {/* 2. 🧩 INTELLIGENT LEARNING MODULES */}
-            <section className="container" style={{ padding: '140px 4rem' }}>
+            <section className="container" style={{ padding: isMobile ? '80px 0' : isTablet ? '100px 0' : '140px 4rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '5.5rem' }}>
                     <h2 style={{ fontSize: '3.2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-1.5px' }}>
                         Intelligent Learning <span style={{ color: 'var(--primary-400)' }}>Modules</span>
@@ -106,7 +110,7 @@ export const Home = () => {
                     </p>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '2rem' }}>
                     {[
                         { title: 'AI Technical Teacher', icon: '🎓', desc: 'Personalized explanations with adaptive depth, powered by advanced AI curriculum synthesis.' },
                         { title: 'Quiz Master', icon: '📋', desc: 'Adaptive assessments that identify knowledge gaps and build mastery through targeted repetition.' },
@@ -140,7 +144,7 @@ export const Home = () => {
             </section>
 
             {/* 3. 🌀 HYPER-LEARNING PATH */}
-            <section className="container" style={{ padding: '80px 4rem 140px' }}>
+            <section className="container" style={{ padding: isMobile ? '20px 0 80px' : isTablet ? '40px 0 100px' : '80px 4rem 140px' }}>
                 <div style={{ textAlign: 'center', marginBottom: '5.5rem' }}>
                     <h2 style={{ fontSize: '3.2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-1.5px' }}>
                         Hyper-Learning <span style={{ color: 'var(--primary-400)' }}>Path</span>
@@ -150,7 +154,7 @@ export const Home = () => {
                     </p>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '2.5rem' }}>
                     {[
                         { step: '01', sub: 'STEP 01', title: 'Analyze', desc: 'AI scans your profile, skills, and career goals to build a personalized learning blueprint.' },
                         { step: '02', sub: 'STEP 02', title: 'Synthesize', desc: 'Intelligent curriculum merges theory, practice, and market demands into optimized modules.' },
@@ -178,7 +182,7 @@ export const Home = () => {
             </section>
 
             {/* 4. ⚙️ CORE ENGINE */}
-            <section className="container" style={{ padding: '0 4rem 140px' }}>
+            <section className="container" style={{ padding: isMobile ? '0 0 80px' : isTablet ? '0 0 100px' : '0 4rem 140px' }}>
                 <div style={{ textAlign: 'center', marginBottom: '5.5rem' }}>
                     <h2 style={{ fontSize: '3.2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-1.5px' }}>
                         Core <span style={{ color: 'var(--primary-400)' }}>Engine</span>
@@ -186,7 +190,7 @@ export const Home = () => {
                     <p style={{ color: 'var(--text-muted)', fontSize: '1.15rem', marginTop: '1rem' }}>High-performance tools powering your learning journey.</p>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '2rem' }}>
                     {[
                         { title: 'CodeX Intelligence', icon: '⌨️', desc: 'Real-time code analysis, optimization suggestions, and mentor feedback loops.' },
                         { title: 'Precision Assessment', icon: '🎯', desc: 'Multi-dimensional evaluation across technical depth, clarity, and applied knowledge.' },
@@ -217,17 +221,17 @@ export const Home = () => {
             </section>
 
             {/* 5. 🤖 AI Mentorship */}
-            <section className="container" style={{ padding: '0 4rem 140px' }}>
+            <section className="container" style={{ padding: isMobile ? '0 0 80px' : isTablet ? '0 0 100px' : '0 4rem 140px' }}>
                 <div style={{ textAlign: 'center', marginBottom: '5.5rem' }}>
                     <h2 style={{ fontSize: '3.2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-1.5px' }}>
                         AI <span style={{ color: 'var(--primary-400)' }}>Mentorship</span>
                     </h2>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '2.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '1.1fr 1fr', gap: '2.5rem' }}>
                     <div style={{
                         background: 'var(--glass-bg)', backdropFilter: 'blur(16px)',
-                        padding: '4.5rem 4rem', borderRadius: '36px',
+                        padding: isMobile ? '2rem 1.5rem' : '4.5rem 4rem', borderRadius: '36px',
                         boxShadow: 'var(--shadow-md)', border: '1px solid var(--glass-border)'
                     }}>
                         <h3 style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '3rem' }}>Platform Intelligence</h3>
@@ -246,7 +250,7 @@ export const Home = () => {
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1.5rem' }}>
                         {[
                             { val: '47.2%', label: 'Faster skill acquisition' },
                             { val: '9', label: 'Engineering domains' },
@@ -268,10 +272,10 @@ export const Home = () => {
             </section>
 
             {/* 6. 🔥 FINAL CTA */}
-            <section className="container" style={{ padding: '0 4rem 180px' }}>
+            <section className="container" style={{ padding: isMobile ? '0 0 110px' : isTablet ? '0 0 140px' : '0 4rem 180px' }}>
                 <div style={{
                     background: 'var(--glass-bg)', backdropFilter: 'blur(20px)',
-                    padding: '6rem 2rem', borderRadius: '40px',
+                    padding: isMobile ? '3rem 1.25rem' : '6rem 2rem', borderRadius: '40px',
                     boxShadow: 'var(--shadow-xl)', border: '1px solid var(--glass-border)',
                     textAlign: 'center'
                 }}>

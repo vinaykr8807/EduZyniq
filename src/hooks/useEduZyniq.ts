@@ -48,6 +48,30 @@ export const useEduZyniq = () => {
     const [isTyping, setIsTyping] = useState(false);
     const [stats, setStats] = useState<any>(null);
 
+    const fetchProfile = useCallback(async () => {
+        const user = getLocalUser();
+        if (!user) return;
+        try {
+            const res = await apiFetch(`${API_BASE_URL}/student/profile?user_email=${encodeURIComponent(user.email)}`);
+            const data = await res.json();
+            const remoteProfile = data?.profile;
+            if (!remoteProfile) return;
+
+            const normalizedProfile: StudentProfile = {
+                degree: remoteProfile.degree || '',
+                branch: remoteProfile.branch || '',
+                year: remoteProfile.year || remoteProfile.academic_year || '',
+                domain: remoteProfile.domain || '',
+                skills: Array.isArray(remoteProfile.skills) ? remoteProfile.skills : []
+            };
+
+            setProfile(normalizedProfile);
+            localStorage.setItem('eduzyniq_profile', JSON.stringify(normalizedProfile));
+        } catch (e) {
+            console.error('Failed to fetch profile:', e);
+        }
+    }, [getLocalUser]);
+
     const fetchProgress = useCallback(async () => {
         const user = getLocalUser();
         if (!user) return;
@@ -69,13 +93,40 @@ export const useEduZyniq = () => {
             setStats(data);
         } catch (e) {
             console.error('Failed to fetch stats:', e);
+            setStats({
+                quiz_accuracy: 0,
+                interview_score: 0,
+                code_optimization: 0,
+                accuracy_trend: [0],
+                domain_strength: {},
+                warning: 'Stats are temporarily unavailable.',
+                no_fallback_used: true,
+                source_counts: {
+                    quiz_history: 0,
+                    quiz_sessions: 0,
+                    interview_sessions: 0,
+                    mock_interview_sessions: 0,
+                    coding_sessions: 0
+                }
+            });
         }
     }, [getLocalUser]);
 
     useEffect(() => {
+        fetchProfile();
         fetchProgress();
         fetchStats();
-    }, [fetchProgress, fetchStats]);
+        const refresh = () => {
+            fetchProgress();
+            fetchStats();
+        };
+        window.addEventListener('focus', refresh);
+        const interval = window.setInterval(refresh, 30000);
+        return () => {
+            window.removeEventListener('focus', refresh);
+            window.clearInterval(interval);
+        };
+    }, [fetchProfile, fetchProgress, fetchStats]);
 
     const updateProfile = useCallback(async (p: StudentProfile) => {
         setProfile(p);

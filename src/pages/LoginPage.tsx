@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL, { apiFetch } from '../config';
 
 export const LoginPage: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -58,9 +59,11 @@ export const LoginPage: React.FC = () => {
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+            const timeoutMs = 30000;
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            const targetUrl = `${API_BASE_URL}${isLogin ? '/login' : '/signup'}`;
 
-            const response = await fetch(`http://127.0.0.1:8000${isLogin ? '/login' : '/signup'}`, {
+            const response = await apiFetch(targetUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -97,9 +100,9 @@ export const LoginPage: React.FC = () => {
             }
         } catch (err: any) {
             console.error("Fetch error:", err);
-            const targetUrl = `http://127.0.0.1:8000${isLogin ? '/login' : '/signup'}`;
+            const targetUrl = `${API_BASE_URL}${isLogin ? '/login' : '/signup'}`;
             if (err.name === 'AbortError') {
-                setError(`Connection timed out at ${targetUrl}. Is the backend slow?`);
+                setError(`Connection timed out at ${targetUrl} after 30s. The backend health check may be up, but auth or the database request did not finish.`);
             } else {
                 setError(`Failed to connect to ${targetUrl}. Error: ${err.message || 'Unknown network error'}`);
             }
@@ -161,7 +164,7 @@ export const LoginPage: React.FC = () => {
                     <input type="email" className="input-field" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '0.9rem 1.2rem' }} />
 
                     <div style={{ position: 'relative' }}>
-                        <input type={showPassword ? "text" : "password"} className="input-field" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: '0.9rem 1.2rem', paddingRight: '2.5rem' }} maxLength={72} />
+                        <input type={showPassword ? "text" : "password"} className="input-field" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: '0.9rem 2.5rem 0.9rem 1.2rem' }} maxLength={72} />
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer' }} onClick={() => setShowPassword(!showPassword)}>
                             {showPassword ? (
                                 <>

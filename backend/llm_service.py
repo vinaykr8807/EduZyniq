@@ -11,6 +11,20 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:latest")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+
+def _configure_tesseract(pytesseract_module):
+    configured = os.getenv("TESSERACT_CMD")
+    candidates = [
+        configured,
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    ]
+    for candidate in candidates:
+        if candidate and os.path.isfile(candidate):
+            pytesseract_module.pytesseract.tesseract_cmd = candidate
+            return
+
+
 def get_system_prompt(mode, profile=None):
     from prompts import get_assistant_prompt, get_student_context
     base_prompt = get_assistant_prompt(mode)
@@ -55,7 +69,8 @@ def extract_text_from_image(image_bytes):
         from PIL import Image
         from io import BytesIO
         import pytesseract
-        
+
+        _configure_tesseract(pytesseract)
         img = Image.open(BytesIO(image_bytes))
         text = pytesseract.image_to_string(img)
         return text
@@ -70,7 +85,18 @@ def extract_text_from_file(file_bytes, filename: str):
     
     try:
         if ext == 'pdf':
-            # 1. Try pdfplumber first (generally better for resumes)
+            # 1. Try pypdf for standard digital PDFs.
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(BytesIO(file_bytes))
+                text = "\n".join((page.extract_text() or "") for page in reader.pages)
+
+                if text.strip():
+                    return text
+            except Exception as e:
+                print(f"pypdf extraction failed: {e}")
+
+            # 2. Try pdfplumber (often better for resume layouts).
             try:
                 import pdfplumber
                 with pdfplumber.open(BytesIO(file_bytes)) as pdf:
@@ -85,7 +111,7 @@ def extract_text_from_file(file_bytes, filename: str):
             except Exception as e:
                 print(f"pdfplumber extraction failed: {e}")
 
-            # 2. Try PyMuPDF (fitz) as second digital fallback
+            # 3. Try PyMuPDF (fitz) as another digital fallback.
             try:
                 import fitz
                 doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -98,10 +124,11 @@ def extract_text_from_file(file_bytes, filename: str):
             except Exception as e:
                 print(f"PyMuPDF extraction failed: {e}")
             
-            # 3. Fallback to OCR for scanned PDFs
+            # 4. Fallback to Tesseract OCR for scanned PDFs.
             try:
                 from pdf2image import convert_from_bytes
                 import pytesseract
+                _configure_tesseract(pytesseract)
                 images = convert_from_bytes(file_bytes, last_page=2)
                 ocr_text = ""
                 for img in images:

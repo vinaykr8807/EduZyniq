@@ -1,261 +1,462 @@
 # EduZyniq
 
-AI-assisted learning and career development platform built with React (frontend), FastAPI (backend), and Supabase (data/storage).
+EduZyniq is an AI-powered learning, interview-preparation, coding, and career-guidance platform. It combines a React student portal, a FastAPI intelligence backend, Supabase persistence/storage, Groq-powered reasoning, OCR/PDF extraction, market-source research, and real-time dashboard analytics.
 
-## Overview
+The project objective is to move beyond a prototype dashboard and build a source-backed student-growth system where resumes, quizzes, interviews, coding attempts, market research, and profile preferences are stored, analyzed, and reused across the product.
 
-EduZyniq combines multiple learning modules in one interface:
+## Project Objectives
 
-- Interview coaching with resume analysis and readiness scoring
-- Adaptive quiz generation and topic-level mastery tracking
-- Coding mentor with sandboxed execution and AI optimization feedback
-- Career pathfinder with market signals and job matching
-- Teacher mode with explainers, generated notes, and downloadable PDFs
-- Admin analytics for platform and student-performance monitoring
+- Give students one workspace for learning, doubts, quizzes, coding practice, interview preparation, resume analysis, and career planning.
+- Store real student activity in Supabase instead of relying on local-only or hardcoded fallback data.
+- Use resumes, uploaded notes, OCR/PDF extraction, quiz attempts, coding errors, and interview sessions as reusable learning context.
+- Provide transparent market and career insights with visible source evidence, not fake or unexplained scores.
+- Support admin monitoring for student progress, readiness, coding performance, and platform activity.
+- Keep backend schema, frontend UI, and Supabase migrations aligned so records written today can be fetched later without mismatch.
+
+## Tool Stack
+
+### Frontend
+
+- React 19
+- TypeScript
+- Vite
+- React Router
+- KaTeX / React KaTeX
+- Mermaid rendering support
+- html2canvas and jsPDF
+- MediaPipe Tasks Vision for browser-side interview posture/frame analysis
+- Custom responsive hooks and glass-style dashboard UI
+
+### Backend
+
+- Python 3.11 compatible FastAPI application
+- Starlette / Uvicorn
+- Pydantic request/response models
+- Supabase Python client
+- PostgreSQL through Supabase
+- Groq API for LLM reasoning and summaries
+- OpenAI package support where configured
+- LangGraph pipeline services
+- Neo4j service integration scaffolding
+- Redis-ready backend dependency support
+
+### AI, Search, OCR, and Documents
+
+- Groq `llama-3.3-70b-versatile`
+- Serper API for indexed market and source evidence
+- DuckDuckGo Search / DDGS for public job discovery
+- FAISS and NumPy for vector memory
+- sentence-transformers for embeddings
+- PyMuPDF, pypdf, pdfplumber, pdf2image
+- pytesseract and Pillow for image OCR
+- python-docx for DOCX extraction
+- ReportLab for generated PDFs
+- trafilatura for web text extraction
+
+### Data and Storage
+
+- Supabase Postgres tables for users, profiles, progress, quiz sessions, interview sessions, coding sessions, coding errors, career reports, market insights, job notifications, job matches, adaptive logs, and chat messages.
+- Supabase Storage buckets:
+  - `resumes`
+  - `student-notes`
+  - `rag-vectors`
+- Optional local FAISS artifacts for interview memory and RAG vectors.
+
+### Development and Deployment
+
+- Vite dev server for frontend
+- Uvicorn dev server for backend
+- Supabase SQL migrations
+- Schema validation script: `backend/scripts/validate_supabase_schema.py`
+- Optional Docker Compose for Neo4j
+- Optional Cloudflare Tunnel for exposing the local backend during remote frontend testing
 
 ## Repository Structure
 
 ```text
 .
-├── src/                         # React + TypeScript frontend (Vite)
-│   ├── pages/                   # Home, Assistant, Admin, Login, etc.
-│   ├── pages/forge/             # Core learning modules
-│   ├── components/              # UI and shared components
-│   └── hooks/                   # Frontend data/API hooks
-├── backend/                     # FastAPI backend
-│   ├── assistants/              # Interview, quiz, coding assistant logic
-│   ├── services/                # Domain services (teacher, market, jobs, etc.)
-│   ├── migrations/              # SQL/Python migration helpers
-│   ├── Codex/                   # Datasets and utilities for CodeX features
-│   └── JOBS DATASET/            # Historical/market datasets used by services
+├── backend/
+│   ├── assistants/                  # Coding mentor, quiz, and assistant-specific logic
+│   ├── migrations/                  # Backend migration helpers and SQL scripts
+│   ├── scripts/                     # Validation and security setup scripts
+│   ├── services/                    # Domain services for career, market, RAG, teacher, interviews
+│   ├── tests/                       # Backend logic tests
+│   ├── main.py                      # FastAPI app and route orchestration
+│   ├── auth_service.py              # Auth helpers and JWT integration
+│   ├── supabase_client.py           # Supabase client initialization
+│   └── requirements.txt
+├── src/
+│   ├── components/                  # Shared UI components
+│   ├── hooks/                       # Frontend hooks and API-driven state
+│   ├── pages/                       # Login, assistant, curriculum, interview room, etc.
+│   ├── pages/forge/                 # Dashboard, career pathfinder, interview coach, coding mentor, teacher
+│   ├── utils/                       # Profile/domain defaults
+│   ├── App.tsx
+│   └── config.ts
 ├── supabase/
-│   ├── config.toml
-│   └── migrations/              # Supabase SQL migrations
+│   ├── migrations/                  # Supabase schema migrations
+│   └── reset_fresh_schema.sql       # Full public-schema reset and bucket recreation script
+├── docs/
+├── docker-compose.neo4j.yml
+├── package.json
 └── README.md
 ```
 
-## System Architecture
+## Technical Architecture
 
 ```mermaid
-graph LR
-    %% Styles
-    classDef client fill:#0ea5e9,stroke:#0369a1,color:#fff,stroke-width:2px;
-    classDef api fill:#10b981,stroke:#047857,color:#fff,stroke-width:2px;
-    classDef ai fill:#f59e0b,stroke:#b45309,color:#fff,stroke-width:2px;
-    classDef engine fill:#8b5cf6,stroke:#6d28d9,color:#fff,stroke-width:2px;
-    classDef infra fill:#64748b,stroke:#334155,color:#fff,stroke-width:2px;
+flowchart TD
+    Student["Student / Admin Browser"] --> Frontend["React + TypeScript + Vite"]
+    Frontend --> API["FastAPI Backend"]
 
-    %% Nodes
-    User((Student Dashboard)):::client
-    Backend{FastAPI Orchestrator}:::api
-    
-    subgraph "Intelligence Layer"
-        Brain[Llama 3.3 Agentic Brain]:::ai
-        RAG[Personal RAG Context]:::ai
-    end
-    
-    subgraph "Specialized Engines"
-        Docker[[Docker Code Sandbox]]:::engine
-        Quiz((Adaptive Quiz Master)):::engine
-        Market((Market Insights - Serper)):::engine
-        PDF_Engine((ReportLab PDF Gen)):::engine
-    end
-    
-    subgraph "Data & Storage"
-        Supabase[(Supabase Postgres & Auth)]:::infra
-        S3[(Supabase Storage - Notes/PDF)]:::infra
-    end
+    API --> Auth["Auth + JWT Middleware"]
+    API --> Profiles["Profile and Progress Services"]
+    API --> Resume["Resume / PDF / DOCX / OCR Pipeline"]
+    API --> Teacher["Teacher Notes and Doubt Pipeline"]
+    API --> Interview["Interview Coach and Interview Room"]
+    API --> Coding["Coding Mentor and Error Tracking"]
+    API --> Career["Career Pathfinder and Job Matching"]
+    API --> Admin["Admin Analytics"]
 
-    %% Connections
-    User <-->|REST API / Tunnel| Backend
-    Backend <--> Brain
-    Brain <--> RAG
-    
-    Backend --> Docker
-    Backend --> Quiz
-    Backend --> Market
-    Backend --> PDF_Engine
-    
-    Backend <--> Supabase
-    PDF_Engine --> S3
-    
-    %% Direction
-    direction LR
+    Resume --> SupabaseStorage["Supabase Storage"]
+    Teacher --> SupabaseStorage
+    Interview --> VectorMemory["FAISS / Embedding Memory"]
+    Teacher --> RAG["Personal RAG Context"]
+
+    Career --> Serper["Serper Search API"]
+    Career --> DDG["DDGS / Job Sources"]
+    Interview --> Groq["Groq LLM"]
+    Career --> Groq
+    Teacher --> Groq
+    Coding --> Groq
+
+    API --> SupabaseDB["Supabase Postgres"]
+    SupabaseStorage --> SupabaseDB
+    VectorMemory --> SupabaseStorage
 ```
 
-### 🎨 Frontend Architecture (React)
-- **Framework**: React 19 with Vite for ultra-fast HMR.
-- **UI Engine**: Vanilla CSS + Glassmorphism design system for a premium developer aesthetic.
-- **Navigation**: State-driven module switching (Teacher → Quiz Master flow).
-- **Visualization**: Dynamic rendering of D2, Mermaid, and LaTeX for technical diagrams and equations.
+### Frontend Flow
 
-### ⚙️ Backend Architecture (FastAPI)
-- **Agentic Logic**: Individual handlers for Interview Coaching, Coding Mentorship, and Curriculum Management.
-- **Code Execution**: Docker-based sandbox system for safe multi-language execution (Python, Node, C++, Java).
-- **Personal RAG**: Intelligent context injection using past student doubts and teacher explanations from Supabase.
-- **Real-time Insights**: Dynamic market trend analysis powered by Serper API and Groq LLM.
+1. User signs up or logs in.
+2. Student profile modal captures degree, academic year, domain, branch, and optional resume.
+3. Domain selections map to target roles across dashboard, Career Pathfinder, and Interview Coach.
+4. Modules call FastAPI through `apiFetch`.
+5. Dashboard fetches Supabase-backed progress instead of hardcoded metrics.
+6. Career and interview screens show source-backed evidence, professional summaries, and clear no-data states.
 
-## Tech Stack
+### Backend Flow
 
-- Frontend: React 19, TypeScript, React Router, Vite
-- Backend: FastAPI, Pydantic, SQLAlchemy, Supabase Python client
-- AI/ML: Groq API, sentence-transformers, FAISS, OCR toolchain
-- Data: Supabase Postgres + Supabase Storage
+1. FastAPI receives module-specific requests.
+2. Auth middleware checks protected API requests.
+3. Supabase clients read/write table rows and storage objects.
+4. Resume uploads are parsed through PDF/DOCX/image extraction and stored in Supabase Storage.
+5. AI services call Groq only where reasoning or rewriting is needed.
+6. Market services query Serper/DDGS and keep source records visible.
+7. Completed interviews, quiz attempts, coding sessions, and coding errors are recorded for later dashboard/admin use.
 
-## Prerequisites
+### Data Flow Principles
+
+- Never present invented progress values when Supabase rows are empty.
+- Do not count interrupted mock interviews as completed interview sessions.
+- Do not treat aggregate job search pages as verified individual vacancies.
+- Keep raw source evidence available while showing clean summaries in the UI.
+- Prefer explicit no-data states over silent fallback scores.
+
+## Core Features
+
+### Student Dashboard
+
+- Supabase-backed quiz accuracy, interview readiness, and code optimization metrics.
+- Profile-aware domain and role selection.
+- Real-time progress fetch from backend.
+- Removed debug row-count labels from production dashboard cards.
+- Empty Supabase rows now show `0%` instead of fallback progress.
+
+### Profile and Onboarding
+
+- Captures academic profile fields.
+- Stores primary domain interest in Supabase.
+- Maps domains to target roles across Career Pathfinder and Interview Coach.
+- Optional AI resume sync with Supabase Storage.
+- Resume upload supports PDF, DOCX, DOC, JPG, JPEG, and PNG MIME detection.
+
+### Teaching Notes and Doubt Feature
+
+- PDF text extraction using PyMuPDF / pypdf / pdfplumber pipeline support.
+- Image text extraction using Tesseract OCR.
+- DOCX extraction using python-docx.
+- Notes storage in Supabase Storage.
+- Personal RAG-ready context for student-specific explanations.
+- Pipeline design supports uploaded images/PDFs as doubt context.
+
+### Interview Coach
+
+- Resume skill extraction and role readiness scoring.
+- Market skill comparison with visible evidence.
+- AI-generated interview plans and questions.
+- Completed mock interviews are persisted only when the session is actually completed.
+- Interview memory uses FAISS/vector artifacts when they exist.
+- Missing vector files now do not crash the question generator.
+- Removed fallback readiness inflation.
+- Historical market panels show verified indexed sources instead of fake bar charts.
+- Source cards display Groq-written professional summaries while preserving original links.
+
+### Interview Room
+
+- Live camera/frame analysis integration.
+- Speech clarity now depends on real speech/audio evidence instead of defaulting to high values.
+- Muted or typed-only sessions no longer produce fake speech clarity scores.
+- Live metrics no longer carry previous-frame fallback values.
+- Evaluation records only count as completed when the full interview flow finishes.
+
+### Career Pathfinder
+
+- Resume-driven career report generation.
+- City and level aware job discovery.
+- Role/domain normalization for Generative AI, ML, UI/UX, cloud, cyber security, and quantum paths.
+- Exact skill matching to avoid false positives such as `SIEM` matching `Siemens`.
+- Aggregate job pages are marked as aggregate sources.
+- Low-detail job sources show role-baseline gaps to verify instead of empty gap sections.
+- Live job demand shows real source-signal counts or `Unknown` when sources fail.
+- Historical market context uses indexed source records instead of generated historical counts.
+- Recruitment risk card now shows source evidence only, not a fake predictive risk score.
+- Source snippets are rewritten into professional summaries through Groq without adding unsupported claims.
+
+### Coding Mentor
+
+- Code analysis and optimization guidance.
+- Coding sessions and coding errors can be persisted in Supabase.
+- Dashboard code optimization can be derived from real coding session/error records.
+- Backend service structure supports code quality records, error tracking, and admin visibility.
+
+### Quiz Master
+
+- Adaptive quiz generation.
+- Quiz session and history tables aligned with Supabase schema.
+- Quiz accuracy dashboard depends on recorded attempts.
+- Progress tracking supports fresh schema reset with zero-state behavior.
+
+### Admin Dashboard
+
+- Student performance analytics.
+- Domain, quiz, interview, coding, and progress visibility.
+- Backend tables aligned so admin views can fetch persisted data rather than local-only metrics.
+- Market and risk overview endpoints now expose confidence/methodology when generated from snippets.
+
+### Job Agent
+
+- Job notification subscriptions.
+- Job matching records.
+- Crawler endpoint and scheduled background crawl support.
+- Career reports can store matched jobs and market context.
+
+## Supabase Schema Coverage
+
+The backend contract currently validates these tables:
+
+- `users`
+- `student_profiles`
+- `chat_messages`
+- `user_progress`
+- `teacher_progress`
+- `interview_sessions`
+- `quiz_sessions`
+- `quiz_history`
+- `progress_tracking`
+- `coding_sessions`
+- `mock_interview_sessions`
+- `market_insights`
+- `career_reports`
+- `job_notifications`
+- `job_matches`
+- `coding_errors`
+- `adaptive_learning_logs`
+
+Storage buckets validated:
+
+- `rag-vectors`
+- `resumes`
+- `student-notes`
+
+Run validation:
+
+```bash
+python backend/scripts/validate_supabase_schema.py
+```
+
+Expected success message:
+
+```text
+Schema validation passed. Backend tables and storage buckets match.
+```
+
+## Setup
+
+### Prerequisites
 
 - Node.js 18+
 - Python 3.10+
-- Supabase project (hosted or local via Supabase CLI)
+- Supabase project
 - Groq API key
+- Serper API key for live market/source evidence
+- Tesseract OCR installed locally if image OCR is needed
+- Poppler installed locally if using PDF-to-image OCR paths
 
-Optional but recommended:
-
-- Docker (for safer multi-language code execution in coding mentor)
-- System OCR dependencies for resume parsing:
-  - `tesseract-ocr`
-  - `poppler-utils` (required by `pdf2image`)
-
-## Quick Start
-
-### 1) Clone and install frontend dependencies
+### Frontend Install
 
 ```bash
-git clone https://github.com/vinaykr8807/EduZyniq.git
-cd EduZyniq
 npm install
 ```
 
-### 2) Setup backend environment
+### Backend Install
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create `backend/.env`:
+On macOS/Linux:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Environment Variables
+
+Create `backend/.env` from `backend/.env.example`.
+
+Required:
 
 ```env
-# Required
-GROQ_API_KEY=your_groq_key
-NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_publishable_key
+SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-# or use SUPABASE_ANON_KEY if running with limited access
+GROQ_API_KEY=your_groq_key
+SERPER_API_KEY=your_serper_key
+JWT_SECRET_KEY=replace_with_strong_random_secret
+```
 
-# Optional / recommended
+Optional:
+
+```env
 DATABASE_URL=postgresql://postgres:password@host:5432/postgres
-JWT_SECRET_KEY=replace_with_strong_secret
-OLLAMA_HOST=http://127.0.0.1:11434
-OLLAMA_MODEL=gemma3:latest
-PEXELS_API_KEY=your_pexels_key
+OPENAI_API_KEY=optional
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your_email
 SMTP_PASS=your_app_password
 FROM_EMAIL=notifications@eduzyniq.ai
-GITHUB_TOKEN=optional_for_codex_reference_search
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=password
 ```
 
-### 3) Database and migrations
+Never commit real `.env` files or backup copies containing secrets.
 
-Use Supabase migrations in `supabase/migrations`.
+### Database Setup
 
-If you use Supabase CLI locally:
+For a fresh hosted Supabase project:
+
+1. Open Supabase SQL Editor.
+2. Run `supabase/reset_fresh_schema.sql` if you intentionally want to wipe public data and recreate the schema.
+3. Run project migrations from `supabase/migrations`.
+4. Run the validation script.
+
+Important:
+
+- Supabase does not allow direct deletion from storage system tables.
+- Storage objects should be deleted through the Supabase Storage API.
+- `reset_fresh_schema.sql` recreates public schema and buckets without direct storage-table deletion.
+
+### Run Backend
 
 ```bash
-supabase start
-supabase db reset
+cd backend
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Notes:
-
-- `backend/init_db.py` contains hardcoded credentials and destructive `DROP TABLE` statements.
-- Do not run `backend/init_db.py` in production environments.
-
-### 4) Run backend
-
-From `backend/`:
+Alternative:
 
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd backend
+python main.py
 ```
 
-Health check:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-### 5) Run frontend
-
-From repository root:
+### Run Frontend
 
 ```bash
 npm run dev
 ```
 
-Frontend runs on Vite default port (`5173`).
+Frontend default URL:
 
-### 6) Expose Local Backend (Cloudflare Tunnel)
-
-To expose your local backend to the internet (e.g., for Vercel frontend to access your local machine's Docker engine), use Cloudflare Tunnel:
-
-```bash
-# Expose the backend port (currently set to 8001)
-cloudflared tunnel --url http://localhost:8001
+```text
+http://localhost:5173
 ```
 
-Copy the `*.trycloudflare.com` URL generated and set it as `VITE_API_URL` in your Vercel or frontend environment.
+Backend default URL:
 
-## Core Modules
+```text
+http://127.0.0.1:8000
+```
 
-- Interview Coach: resume deep analysis, skill-gap mapping, interview plan and evaluation
-- Quiz Master: quiz generation, explanation evaluation, feedback, confidence-aware progress updates
-- Coding Mentor: code analysis + optional execution sandbox across languages
-- Career Pathfinder: role/city-specific job discovery, suitability scoring, report generation
-- Teacher: topic explanation, market skills, beginner guide, notes PDF generation/storage
-- Analytics/Admin: student metrics, domain distribution, readiness and optimization aggregates
+## API Surface
 
-## API Surface (Selected)
-
-Authentication:
+### Auth and Profile
 
 - `POST /signup`
 - `POST /login`
-
-Student profile and progress:
-
 - `POST /save-profile`
 - `GET /student/profile`
+- `GET /resume-status`
+
+### Student Progress
+
 - `GET /student/progress`
 - `GET /performance-stats`
+- `GET /student/notes`
 
-Assistant/core:
+### Resume and Career
 
-- `POST /chat`
 - `POST /upload-resume`
 - `POST /analyze-resume`
 - `POST /career-pathfinder`
-- `GET /generate-quiz`
-- `POST /submit-quiz`
-- `POST /quiz-feedback`
-- `POST /analyze-code`
-- `POST /execute-code`
+- `POST /job-agent/subscribe`
+- `POST /job-agent/run-crawler`
 
-Teacher/coach:
+### Teacher
 
 - `POST /teacher/explain`
 - `POST /teacher/generate-notes`
-- `GET /student/notes`
 - `POST /teacher/market-skills`
+
+### Interview Coach
+
 - `POST /coach/beginner-guide`
 - `POST /coach/mock-interview/plan`
 - `POST /coach/mock-interview/question`
+- `POST /coach/mock-interview/analyze-frame`
+- `POST /coach/mock-interview/analyze-speech`
 - `POST /coach/mock-interview/evaluate`
 
-Admin:
+### Quiz
+
+- `GET /generate-quiz`
+- `POST /submit-quiz`
+- `POST /quiz-feedback`
+
+### Coding
+
+- `POST /analyze-code`
+- `POST /execute-code`
+
+### Admin
 
 - `GET /admin/analytics`
 - `GET /admin/student-performance`
@@ -263,49 +464,171 @@ Admin:
 - `GET /admin/historical-market-overview`
 - `GET /admin/risk-overview`
 
-Jobs agent:
+## Recent Milestones
 
-- `POST /job-agent/subscribe`
-- `POST /job-agent/run-crawler`
+### Milestone 1: Backend Compatibility and Startup Fixes
 
-CodeX:
+- Fixed FastAPI/Starlette dependency mismatch that caused `Router.__init__() got an unexpected keyword argument 'on_startup'`.
+- Aligned `requirements.txt` with compatible FastAPI and Starlette versions.
+- Improved CORS/auth behavior so backend 500 errors do not appear as unexplained frontend CORS failures.
 
-- `GET /codex/problems`
-- `POST /codex/check-alignment`
-- `POST /codex/analyze-lines`
-- `POST /codex/references`
-- `POST /codex/generate-tests`
-- `POST /codex/enhance`
-- `POST /codex/compare`
+### Milestone 2: Supabase Connectivity and Schema Alignment
 
-## Environment and Deployment Notes
+- Added backend schema validation against live Supabase.
+- Created a full schema alignment migration.
+- Added fresh reset SQL for starting from clean data without destroying table structure manually.
+- Validated all expected tables and storage buckets.
+- Updated backend logic to prefer Supabase-backed records over local fallback values.
 
-- Frontend API URLs are currently hardcoded in several places to `http://127.0.0.1:8000`.
-- Supabase Storage buckets used by backend include at least:
-  - `resumes`
-  - `student-notes`
-- A background task in `backend/main.py` runs a job crawler every 24 hours while the server is up.
-- Coding execution falls back to local runtime if Docker is unavailable.
+### Milestone 3: Dashboard Accuracy
 
-## Data and Large Files
+- Removed default dashboard values like `80%` interview readiness when Supabase rows are empty.
+- Dashboard now shows `0%` when no quiz, interview, or coding records exist.
+- Removed debug labels such as `Supabase rows: 0` from student-facing cards.
+- Mock interview count now increments only after completed interviews.
 
-- The repository includes sizeable datasets under `backend/JOBS DATASET` and `backend/Codex`.
-- GitHub rejects files larger than 100 MB in normal Git history.
-- If you need to version very large datasets, use Git LFS:
-  - https://git-lfs.github.com/
+### Milestone 4: Resume Storage and Extraction
+
+- Fixed Supabase Storage MIME upload errors by detecting file content type.
+- Added support for PDF, DOC, DOCX, JPG, JPEG, and PNG resume files.
+- Ensured resume extraction can use PDF parsing and OCR/image parsing paths.
+- Connected onboarding resume sync to Supabase Storage.
+
+### Milestone 5: Interview Coach Reliability
+
+- Fixed `NameError: interview_memory is not defined`.
+- Made missing FAISS artifacts non-fatal when starting fresh after database reset.
+- Removed fake speech clarity fallback values.
+- Made interview metrics evidence-based.
+- Added source-backed market views instead of estimated chart-only views.
+
+### Milestone 6: Career Pathfinder Quality
+
+- Removed fake historical source signal bars and replaced them with verified indexed market sources.
+- Reworked recruitment risk from generated score to source evidence only.
+- Added professional summaries for source cards through Groq.
+- Improved job matching with exact skill matching.
+- Penalized senior listings for junior/fresher candidates.
+- Penalized aggregate job pages so they do not appear as perfect matches.
+- Added low-detail source handling so empty gap fields now show role-baseline gaps to verify.
+
+### Milestone 7: Domain and Role Memory
+
+- Added profile default mapping from domain to target role.
+- Career Pathfinder and Interview Coach now remember profile domain intent.
+- Fixed cases where Generative AI / ML profile choices appeared as unrelated full-stack defaults.
+
+### Milestone 8: Security and Operations
+
+- Added safer database initialization behavior.
+- Added environment setup script support.
+- Documented no-secret commit policy.
+- Kept service-role credentials out of README examples.
+
+## Bugs Fixed
+
+- FastAPI app startup crash caused by dependency mismatch.
+- Frontend fetch failures caused by backend 500 errors surfacing as CORS errors.
+- Supabase Storage upload failure: `invalid_mime_type text/plain is not supported`.
+- Dashboard showing `80%` interview readiness after database reset.
+- Debug Supabase row counts appearing on student dashboard.
+- Mock interview sessions counted when the interview was interrupted.
+- Speech clarity showing high values while muted or typed-only.
+- Interview question endpoint crashing when vector memory files were absent.
+- Career profile showing full-stack role despite Generative AI domain.
+- Career job matching falsely matching `SIEM` with `Siemens`.
+- Aggregate job pages being treated as individual verified jobs.
+- Job gap section showing `No listed gaps` for low-detail aggregate pages.
+- Recruitment risk showing scary generated levels without audited evidence.
+- Historical market charts showing estimated counts as if they were real totals.
+- Raw search snippets appearing as broken source text in UI.
+
+## Features Added
+
+- Supabase schema validator.
+- Full fresh schema reset SQL.
+- Profile-domain role mapping.
+- Resume MIME detection and storage sync.
+- PDF/DOCX/image extraction pipeline support.
+- Interview room service and completion-aware persistence.
+- Interview memory service scaffolding.
+- Source-backed historical market records.
+- Source-backed recruitment risk evidence.
+- Groq professional summaries for source cards.
+- Career report storage and job-match records.
+- Low-detail job evidence flags.
+- Aggregate source badges in Career Pathfinder.
+- Responsive frontend hook.
+- Neo4j and LangGraph service scaffolding.
+- Backend tests for career matching edge cases.
+
+## Testing and Verification
+
+Run frontend build:
+
+```bash
+npm run build
+```
+
+Run backend compile checks:
+
+```bash
+python -m py_compile backend/main.py
+python -m py_compile backend/services/career_pathfinder.py
+python -m py_compile backend/services/historical_market_data.py
+```
+
+Run career logic tests:
+
+```bash
+cd backend
+python -m unittest discover -s tests -p "test_career_pathfinder_logic.py" -v
+```
+
+Validate Supabase schema:
+
+```bash
+python backend/scripts/validate_supabase_schema.py
+```
 
 ## Security Notes
 
-- Never commit real API keys, service-role keys, or SMTP credentials.
-- Rotate any secrets that were previously exposed.
-- Review CORS, auth policies, and RLS before production deployment.
+- Do not commit `backend/.env`, `.env.local`, backup env files, service-role keys, JWT secrets, SMTP passwords, or local tokens.
+- Use Supabase Row Level Security before production.
+- Treat `SUPABASE_SERVICE_ROLE_KEY` as server-only.
+- Keep CORS origin restrictions tight for production deployments.
+- Rotate keys if they were ever pasted into logs, screenshots, or commits.
+- Use Storage API for deleting Supabase Storage objects.
 
-## Development Workflow
+## Deployment Notes
 
-- Frontend: `npm run dev`, `npm run build`, `npm run lint`
-- Backend: `uvicorn main:app --reload`
-- Contribution guidelines: see [CONTRIBUTING.md](CONTRIBUTING.md)
+Frontend can be deployed to Vercel, Netlify, or any static hosting provider after `npm run build`.
+
+Backend can be deployed to a Python ASGI host with:
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+For local testing with a remote frontend, expose the backend with Cloudflare Tunnel:
+
+```bash
+cloudflared tunnel --url http://localhost:8000
+```
+
+Then configure the frontend API base URL accordingly.
+
+## Roadmap
+
+- Add formal RLS policies for every Supabase table.
+- Add backend integration tests for profile, dashboard, interview, quiz, coding, and career endpoints.
+- Add queue/background worker for job crawling and long-running market research.
+- Add admin export reports.
+- Add source-quality scoring for job links.
+- Persist OCR extraction metadata for uploaded resumes and notes.
+- Add GitHub Actions CI for frontend build, backend compile, and schema validation.
+- Add semantic versioning and release notes.
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](LICENSE).
+This project is licensed under the MIT License. See [LICENSE](LICENSE).

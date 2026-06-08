@@ -8,6 +8,8 @@ DOMAIN_MAP = {
     "AI/ML": ["TensorFlow", "PyTorch", "Deep Learning", "CNN", "RNN", "NLP", "Computer Vision"],
     "Backend": ["Node", "Django", "Spring", "FastAPI", "Go", "Java", "PHP", "PostgreSQL", "MongoDB"],
     "DevOps": ["Docker", "Kubernetes", "AWS", "CI/CD", "Jenkins", "Terraform", "Ansible"],
+    "UI/UX Design": ["Figma", "Wireframing", "Prototyping", "User Research", "Design Systems"],
+    "Quantum Computing": ["Qiskit", "Quantum Algorithms", "Linear Algebra", "Circuits"],
 }
 
 ROLE_SKILLS = {
@@ -15,7 +17,12 @@ ROLE_SKILLS = {
     "Fullstack Developer": ["React", "Node", "SQL", "HTML", "CSS", "JavaScript", "API Design"],
     "Data Scientist": ["Python", "SQL", "Machine Learning", "Statistics", "Data Visualization"],
     "Backend Engineer": ["Node" or "Python", "SQL", "NoSQL", "System Design", "Docker"],
-    "DevOps Engineer": ["Cloud (AWS/Azure)", "Docker", "Kubernetes", "CI/CD", "Linux"]
+    "DevOps Engineer": ["Cloud (AWS/Azure)", "Docker", "Kubernetes", "CI/CD", "Linux"],
+    "Cloud Architect": ["AWS", "Azure", "GCP", "Terraform", "Networking"],
+    "Cyber Security Analyst": ["Networking", "Linux", "SIEM", "Incident Response", "Security"],
+    "ML Engineer": ["Python", "Machine Learning", "Deep Learning", "MLOps"],
+    "UI/UX Designer": ["Figma", "Wireframing", "Prototyping", "User Research"],
+    "Quantum Computing Researcher": ["Qiskit", "Quantum Algorithms", "Linear Algebra"]
 }
 
 def extract_skills_with_llm(resume_text):

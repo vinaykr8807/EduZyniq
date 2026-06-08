@@ -7,8 +7,13 @@ CREATE TABLE IF NOT EXISTS public.market_insights (
     role text NOT NULL,
     domain text NOT NULL,
     type text NOT NULL,
+    result jsonb,
+    evidence_count integer DEFAULT 0,
     created_at timestamptz DEFAULT now()
 );
+
+ALTER TABLE public.market_insights ADD COLUMN IF NOT EXISTS result jsonb;
+ALTER TABLE public.market_insights ADD COLUMN IF NOT EXISTS evidence_count integer DEFAULT 0;
 """
 
 # Since we don't have a direct SQL executor in this environment's Supabase client easily,

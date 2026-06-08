@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from './layouts/MainLayout';
 import { Home } from './pages/Home';
@@ -7,6 +7,8 @@ import { LoginPage } from './pages/LoginPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { CurriculumPage } from './pages/CurriculumPage';
 import { useTheme } from './hooks/useTheme';
+
+const InterviewRoom = lazy(() => import('./pages/InterviewRoom.tsx'));
 
 // Simple Route Guard
 const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: string }) => {
@@ -40,6 +42,14 @@ function App() {
           <Route path="/assistant" element={
             <ProtectedRoute role="student">
               <Assistant />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/interview-room" element={
+            <ProtectedRoute role="student">
+              <Suspense fallback={<div style={{ padding: '2rem' }}>Loading interview room…</div>}>
+                <InterviewRoom />
+              </Suspense>
             </ProtectedRoute>
           } />
 

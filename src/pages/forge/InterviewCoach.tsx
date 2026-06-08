@@ -1,5 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import API_BASE_URL, { apiFetch } from '../../config';
+import { useResponsive } from '../../hooks/useResponsive';
+import { getDomainForRole, getRoleForDomain, TARGET_ROLES } from '../../utils/profileDefaults';
 
 interface ResumeProject {
     name: string;
@@ -41,8 +44,13 @@ interface MarketSkills {
     top_tools: string[];
     avg_salary_india: string;
     demand_level: string;
+    beginner_summary?: string;
     growth_trend: string;
     trend_analytics?: { skill: string; demand_score: number }[];
+    source_summary?: string[];
+    evidence_matrix?: { skill: string; demand_score: number; why_required: string; evidence: string }[];
+    fresher_action_plan?: string[];
+    confidence_note?: string;
 }
 
 interface BeginnerGuide {
@@ -57,10 +65,32 @@ interface HistoricalTrends {
     trend_line: { year: string; count: number }[];
     top_historical_companies: { name: string; count: number }[];
     total_historical_records: number;
+    source_records?: {
+        title: string;
+        link: string;
+        source: string;
+        snippet: string;
+        professional_summary?: string;
+        date?: string;
+    }[];
+    source_domains?: { name: string; count: number }[];
+    confidence?: string;
+    methodology?: string;
+    error?: string;
+    no_fallback_used?: boolean;
 }
 
-const ROLES = ['Frontend Engineer', 'Fullstack Developer', 'Data Scientist', 'DevOps Engineer', 'ML Engineer', 'Backend Engineer', 'Cloud Architect', 'Cyber Security Analyst'];
-const DOMAINS = ['Full Stack Development', 'Generative AI & Machine Learning', 'Cyber Security', 'DevOps & Cloud Engineering', 'Cloud Solutions Architecture', 'Core CS & Algorithms', 'Data Engineering & MLOps'];
+const INTERVIEW_ROOM_STORAGE_KEY = 'eduzyniq_interview_room_config';
+const INTERVIEW_PREFS_STORAGE_KEY = 'eduzyniq_interview_preferences';
+
+const getStoredInterviewPrefs = () => {
+    try {
+        return JSON.parse(localStorage.getItem(INTERVIEW_PREFS_STORAGE_KEY) || '{}');
+    } catch {
+        localStorage.removeItem(INTERVIEW_PREFS_STORAGE_KEY);
+        return {};
+    }
+};
 
 const saveInterviewSession = async (payload: object) => {
     try {
@@ -86,14 +116,28 @@ const playInterviewSound = (type: 'next' | 'finish') => {
 };
 
 export const InterviewCoach = ({ onComplete }: any) => {
+    const { isMobile, isTablet } = useResponsive();
+    const isCompact = isMobile || isTablet;
+    const navigate = useNavigate();
     const [file, setFile] = useState<File | null>(null);
-    const [role, setRole] = useState('Frontend Engineer');
-    const [domain, setDomain] = useState('Full Stack Development');
-    const [level, setLevel] = useState('Junior');
+    const storedPrefs = getStoredInterviewPrefs();
+    const localProfile = (() => {
+        try {
+            return JSON.parse(localStorage.getItem('eduzyniq_profile') || '{}');
+        } catch {
+            return {};
+        }
+    })();
+    const initialProfileRole = getRoleForDomain(localProfile?.domain);
+    const initialRole = storedPrefs.role || initialProfileRole || '';
+    const [role, setRole] = useState(initialRole);
+    const [domain, setDomain] = useState(storedPrefs.domain || localProfile?.domain || getDomainForRole(initialRole));
+    const [level, setLevel] = useState(storedPrefs.level || 'Junior');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [hasStoredResume, setHasStoredResume] = useState(false);
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [marketSkills, setMarketSkills] = useState<MarketSkills | null>(null);
+    const [marketError, setMarketError] = useState('');
     const [marketLoading, setMarketLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<'gap' | 'roadmap' | 'trends' | 'mentor' | 'mock' | 'ats'>('gap');
     const [beginnerGuide, setBeginnerGuide] = useState<BeginnerGuide | null>(null);
@@ -114,7 +158,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const recognitionRef = useRef<any>(null);
 
     // Coding challenge state
-    const [codingLanguage, setCodingLanguage] = useState('python');
+    const [codingLanguage, setCodingLanguage] = useState(storedPrefs.codingLanguage || 'python');
     const [userApproach, setUserApproach] = useState('');
     const [userCode, setUserCode] = useState('');
     const [codingPhase, setCodingPhase] = useState<'approach' | 'code' | 'results'>('approach');
@@ -122,6 +166,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
     const [testResults, setTestResults] = useState<any>(null);
     const [codingEval, setCodingEval] = useState<any>(null);
     const [confirmSkip, setConfirmSkip] = useState(false);
+    const prefsLoadedRef = useRef(Boolean(storedPrefs.role || storedPrefs.domain || storedPrefs.level || storedPrefs.codingLanguage));
 
     // Initialize Speech Recognition
     useEffect(() => {
@@ -177,6 +222,20 @@ export const InterviewCoach = ({ onComplete }: any) => {
                 alert("Speech recognition isn't supported in your browser.");
             }
         }
+    };
+
+    const openInterviewRoom = () => {
+        const roomConfig = {
+            role,
+            domain,
+            level,
+            codingLanguage,
+            result
+        };
+        localStorage.setItem(INTERVIEW_ROOM_STORAGE_KEY, JSON.stringify(roomConfig));
+        navigate('/interview-room', {
+            state: roomConfig
+        });
     };
 
     // Start Mock Interview Session
@@ -267,7 +326,14 @@ export const InterviewCoach = ({ onComplete }: any) => {
             const ev = await res.json();
             setCodingEval(ev);
             setCodingPhase('results');
-            const newEvals = [...mockEvals, { ...ev, question: currentQuestion.question, type: 'coding' }];
+            const newEvals = [...mockEvals, {
+                ...ev,
+                question: currentQuestion.question,
+                answer: userApproach || userCode,
+                approach_text: userApproach,
+                code: userCode,
+                type: 'coding'
+            }];
             setMockEvals(newEvals);
             const nextIdx = mockIndex + 1;
             if (nextIdx >= (mockPlan?.length || 0)) {
@@ -285,10 +351,17 @@ export const InterviewCoach = ({ onComplete }: any) => {
             const res = await apiFetch(`${API_BASE_URL}/coach/mock-interview/evaluate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ role, domain, question: currentQuestion.question, answer: userMockAnswer })
+                body: JSON.stringify({
+                    role,
+                    domain,
+                    question: currentQuestion.question,
+                    answer: userMockAnswer,
+                    expected_key_points: currentQuestion.expected_key_points || [],
+                    interviewer_focus: currentQuestion.interviewer_focus || []
+                })
             });
             const ev = await res.json();
-            const newEvals = [...mockEvals, { ...ev, question: currentQuestion.question, type: 'standard' }];
+            const newEvals = [...mockEvals, { ...ev, question: currentQuestion.question, answer: userMockAnswer, type: 'standard' }];
             setMockEvals(newEvals);
             const nextIdx = mockIndex + 1;
             if (nextIdx < (mockPlan?.length || 0)) {
@@ -358,7 +431,25 @@ export const InterviewCoach = ({ onComplete }: any) => {
             await apiFetch(`${API_BASE_URL}/coach/mock-interview/save-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_email: user.email, role, domain, language: codingLanguage, evaluations: evals })
+                body: JSON.stringify({
+                    user_email: user.email,
+                    role,
+                    domain,
+                    language: codingLanguage,
+                    evaluations: evals,
+                    expected_question_count: mockPlan.length,
+                    room_summary: {
+                        session_kind: 'classic',
+                        is_completed: true,
+                        completed_questions: evals.length,
+                        expected_questions: mockPlan.length
+                    },
+                    report: {
+                        is_completed: true,
+                        completed_questions: evals.length,
+                        expected_questions: mockPlan.length
+                    }
+                })
             });
         } catch { /* silent */ }
     };
@@ -381,17 +472,44 @@ export const InterviewCoach = ({ onComplete }: any) => {
             .then((r) => r.json())
             .then((data) => {
                 if (data.has_stored_resume) setHasStoredResume(true);
-                if (data.profile?.domain) {
-                    console.log("Auto-selecting domain from profile:", data.profile.domain);
-                    setDomain(data.profile.domain);
+                const savedProfile = data.profile;
+                const latestPrefs = getStoredInterviewPrefs();
+                if (savedProfile?.domain && (!latestPrefs.domain || !latestPrefs.role)) {
+                    const profileRole = getRoleForDomain(savedProfile.domain);
+                    if (profileRole) setRole(profileRole);
+                    setDomain(savedProfile.domain);
                 }
+                if (savedProfile?.academic_year && !latestPrefs.level) {
+                    setLevel(savedProfile.academic_year === 'Final Year' ? 'Fresher' : 'Junior');
+                }
+                prefsLoadedRef.current = true;
             })
-            .catch((err) => console.error("Error fetching profile context:", err));
+            .catch((err) => {
+                prefsLoadedRef.current = true;
+                console.error("Error fetching profile context:", err);
+            });
     }, []);
 
-    const fetchMarketSkills = async () => {
+    const handleRoleChange = (selectedRole: string) => {
+        setRole(selectedRole);
+        const mappedDomain = getDomainForRole(selectedRole);
+        if (mappedDomain) setDomain(mappedDomain);
+    };
+
+    useEffect(() => {
+        if (!prefsLoadedRef.current) return;
+        localStorage.setItem(INTERVIEW_PREFS_STORAGE_KEY, JSON.stringify({
+            role,
+            domain,
+            level,
+            codingLanguage
+        }));
+    }, [role, domain, level, codingLanguage]);
+
+    const fetchMarketSkills = async (): Promise<MarketSkills | null> => {
         setMarketLoading(true);
         setActiveTab('trends');
+        setMarketError('');
         try {
             const user = JSON.parse(localStorage.getItem('eduzyniq_user') || '{}');
             const response = await apiFetch(`${API_BASE_URL}/teacher/market-skills`, {
@@ -400,9 +518,17 @@ export const InterviewCoach = ({ onComplete }: any) => {
                 body: JSON.stringify({ role, domain, user_email: user.email })
             });
             const data = await response.json();
+            if (!response.ok || data.error) {
+                setMarketSkills(null);
+                setMarketError(data.error || 'Market research failed. No fallback data was used.');
+                return null;
+            }
             setMarketSkills(data);
+            return data;
         } catch {
             setMarketSkills(null);
+            setMarketError('Market research failed. No fallback data was used.');
+            return null;
         } finally {
             setMarketLoading(false);
         }
@@ -455,33 +581,29 @@ export const InterviewCoach = ({ onComplete }: any) => {
         if (user.email) formData.append('user_email', user.email);
 
         try {
-            const [resumeRes] = await Promise.all([
+            const [resumeRes, latestMarketSkills] = await Promise.all([
                 apiFetch(`${API_BASE_URL}/analyze-resume`, { method: 'POST', body: formData }),
                 fetchMarketSkills()
             ]);
             fetchHistoricalTrends(); // Background load
             const data = await resumeRes.json();
             setResult(data);
-            // Save session to Supabase after state update (300ms allows setMarketSkills to propagate)
-            setTimeout(() => {
-                const stateSnapshot = marketSkills;
-                saveInterviewSession({
-                    role,
-                    domain,
-                    level,
-                    readiness_score: data.readiness_score || 0,
-                    extracted_skills: data.extracted_skills || [],
-                    matched_skills: (data.extracted_skills || []).filter((s: string) =>
-                        (stateSnapshot?.required_skills || []).some((r: string) =>
-                            r.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(r.toLowerCase())
-                        )
-                    ),
-                    missing_skills: data.missing_skills || [],
-                    market_skills: stateSnapshot?.required_skills || [],
-                    strong_domains: data.strong_domains || [],
-                    ats_score: data.ats_score || null
-                });
-            }, 300);
+            saveInterviewSession({
+                role,
+                domain,
+                level,
+                readiness_score: data.readiness_score || 0,
+                extracted_skills: data.extracted_skills || [],
+                matched_skills: (data.extracted_skills || []).filter((s: string) =>
+                    (latestMarketSkills?.required_skills || []).some((r: string) =>
+                        r.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(r.toLowerCase())
+                    )
+                ),
+                missing_skills: data.missing_skills || [],
+                market_skills: latestMarketSkills?.required_skills || [],
+                strong_domains: data.strong_domains || [],
+                ats_score: data.ats_score || null
+            });
             if (onComplete) onComplete();
         } catch (e) {
             console.error(e);
@@ -500,22 +622,23 @@ export const InterviewCoach = ({ onComplete }: any) => {
             </header>
 
             {/* Config Panel */}
-            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem', alignItems: 'start' }} className="coach-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : '320px 1fr', gap: '1.5rem', alignItems: 'start' }} className="coach-grid">
                 <div className="glass-card flex-col gap-lg" style={{ padding: '1.5rem' }}>
                     <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary-600)', textTransform: 'uppercase', letterSpacing: '1px' }}>Setup</h3>
 
                     <div className="flex-col gap-xs">
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Target Role</span>
-                        <select value={role} onChange={e => setRole(e.target.value)} className="input-field" style={{ padding: '0.65rem' }}>
-                            {ROLES.map(r => <option key={r}>{r}</option>)}
+                        <select value={role} onChange={e => handleRoleChange(e.target.value)} className="input-field" style={{ padding: '0.65rem' }}>
+                            <option value="" disabled>Select target role</option>
+                            {TARGET_ROLES.map(r => <option key={r}>{r}</option>)}
                         </select>
                     </div>
 
                     <div className="flex-col gap-xs">
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Learning Domain</span>
-                        <select value={domain} onChange={e => setDomain(e.target.value)} className="input-field" style={{ padding: '0.65rem' }}>
-                            {DOMAINS.map(d => <option key={d}>{d}</option>)}
-                        </select>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Saved Domain</span>
+                        <div className="input-field" style={{ padding: '0.65rem', color: domain ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {domain || 'Select your primary domain in onboarding'}
+                        </div>
                     </div>
 
                     <div className="flex-col gap-xs">
@@ -584,11 +707,10 @@ export const InterviewCoach = ({ onComplete }: any) => {
 
                     <button
                         className="btn btn-primary w-full"
-                        onClick={startMockInterview}
-                        disabled={isMockLoading}
+                        onClick={openInterviewRoom}
                         style={{ background: 'linear-gradient(135deg, var(--primary-500), #059669)', border: 'none', color: 'white', fontWeight: 800, marginTop: '0.5rem' }}
                     >
-                        {isMockLoading ? '⏳ Starting Simulator…' : '🎙️ Start AI Mock Interview'}
+                        🎙️ Start AI Mock Interview
                     </button>
                 </div>
 
@@ -608,6 +730,13 @@ export const InterviewCoach = ({ onComplete }: any) => {
                         <div className="glass-card flex-col items-center justify-center" style={{ minHeight: '200px', gap: '1rem' }}>
                             <div style={{ width: '48px', height: '48px', border: '4px solid rgba(100,130,255,0.15)', borderTopColor: 'var(--primary-500)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                             <p style={{ color: 'var(--text-secondary)' }}>Fetching market intelligence + parsing resume…</p>
+                        </div>
+                    )}
+
+                    {marketError && !marketLoading && (
+                        <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.04)' }}>
+                            <h3 style={{ fontSize: '0.95rem', color: 'var(--accent-red)', marginBottom: '0.5rem' }}>Market Research Unavailable</h3>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{marketError}</p>
                         </div>
                     )}
 
@@ -670,7 +799,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                 </div>
 
                                 {marketSkills && (
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
                                         <div className="glass-card" style={{ padding: '1.25rem', border: '1px solid rgba(100,130,255,0.2)' }}>
                                             <h5 style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--primary-500)', marginBottom: '0.75rem' }}>✅ Matching Market Skills</h5>
                                             <div className="flex flex-wrap gap-xs">
@@ -818,16 +947,25 @@ export const InterviewCoach = ({ onComplete }: any) => {
                         {/* Trends */}
                         {activeTab === 'trends' && marketSkills && (
                             <div className="flex-col gap-lg fade-in">
+                                <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid rgba(56,183,248,0.22)', background: 'rgba(56,183,248,0.03)' }}>
+                                    <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--primary-500)', marginBottom: '0.75rem' }}>What This Market Report Means</h4>
+                                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+                                        {marketSkills.beginner_summary || `This compares your target ${role} role in ${domain} against skills employers repeatedly mention in job descriptions and interview/review signals.`}
+                                    </p>
+                                    {marketSkills.confidence_note && (
+                                        <p style={{ marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{marketSkills.confidence_note}</p>
+                                    )}
+                                </div>
                                 <div className="glass-card" style={{ padding: '1.5rem' }}>
                                     <h4 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '1.5rem', color: 'var(--primary-500)' }}>📈 Live Market Skill Demand</h4>
                                     <div className="flex-col gap-md">
-                                        {(marketSkills.trend_analytics || [
+                                        {(marketSkills.evidence_matrix || marketSkills.trend_analytics || [
                                             { skill: 'Core Tech Stack', demand_score: 95 },
                                             { skill: 'Cloud & DevOps', demand_score: 82 },
                                             { skill: 'AI Integration', demand_score: 75 },
                                             { skill: 'Soft Skills', demand_score: 65 }
-                                        ]).map((trend, i) => (
-                                            <div key={i} className="flex-col gap-xs">
+                                        ]).map((trend: any, i) => (
+                                            <div key={i} className="flex-col gap-xs" style={{ padding: '0.8rem 0', borderBottom: '1px solid var(--glass-border)' }}>
                                                 <div className="flex justify-between" style={{ fontSize: '0.8rem' }}>
                                                     <span style={{ fontWeight: 700 }}>{trend.skill}</span>
                                                     <span style={{ color: 'var(--text-muted)' }}>{trend.demand_score}% Demand</span>
@@ -835,16 +973,27 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                 <div style={{ height: '10px', background: 'var(--glass-border)', borderRadius: '5px', overflow: 'hidden' }}>
                                                     <div style={{ height: '100%', width: `${trend.demand_score}%`, background: i === 0 ? 'var(--primary-500)' : 'var(--accent-blue)', transition: 'width 1s ease' }} />
                                                 </div>
+                                                {trend.why_required && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>{trend.why_required}</p>}
+                                                {trend.evidence && <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>Evidence: {trend.evidence}</p>}
                                             </div>
                                         ))}
                                     </div>
                                     <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '1.5rem', fontStyle: 'italic' }}>
-                                        *Data periodically scraped from live tech job portals and industry reports for 2026 outlook.
+                                        Demand scores are model-estimated from repeated source signals, not guaranteed market percentages.
                                     </p>
                                 </div>
                                 <div className="glass-card" style={{ padding: '1.5rem' }}>
                                     <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-orange)', marginBottom: '0.5rem' }}>💼 Market Pulse</h4>
                                     <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{marketSkills.growth_trend}</p>
+                                    {(marketSkills.source_summary || []).length > 0 && (
+                                        <div className="flex-col gap-xs" style={{ marginTop: '1rem' }}>
+                                            {(marketSkills.source_summary || []).map((item, index) => (
+                                                <p key={index} style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                                                    {item}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    )}
                                     <div className="flex-col gap-sm" style={{ marginTop: '1rem' }}>
                                         <p style={{ fontSize: '0.75rem', fontWeight: 800 }}>Average Salary: <span style={{ color: 'var(--primary-500)' }}>{marketSkills.avg_salary_india}</span></p>
                                         <div className="flex flex-wrap gap-xs">
@@ -853,45 +1002,70 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                     </div>
                                 </div>
 
+                                {(marketSkills.fresher_action_plan || []).length > 0 && (
+                                    <div className="glass-card" style={{ padding: '1.5rem', borderLeft: '5px solid var(--accent-green)' }}>
+                                        <h4 style={{ fontSize: '0.9rem', fontWeight: 900, marginBottom: '1rem' }}>What You Should Do Next As A Fresher</h4>
+                                        <div className="flex-col gap-sm">
+                                            {(marketSkills.fresher_action_plan || []).map((item, index) => (
+                                                <div key={index} style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem', border: '1px solid var(--glass-border)', borderRadius: '8px', background: 'rgba(52,160,90,0.03)' }}>
+                                                    <span style={{ color: 'var(--accent-green)', fontWeight: 900 }}>{index + 1}</span>
+                                                    <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{item}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {historicalTrends && historicalTrends.total_historical_records > 0 && (
                                     <div className="glass-card fade-in" style={{ padding: '1.5rem', background: 'rgba(100,130,255,0.02)', border: '1px solid rgba(100,130,255,0.1)' }}>
                                         <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--accent-teal)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: 'sm' }}>
-                                            📜 Historical Market Context (2021-2025)
+                                            Verified Indexed Market Sources
                                         </h4>
                                         <div className="flex-col gap-lg">
-                                            <div className="flex gap-lg" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: '100px', padding: '0 1rem' }}>
-                                                {historicalTrends.trend_line.map((item, i) => {
-                                                    const maxCount = Math.max(...historicalTrends.trend_line.map(t => t.count), 1);
-                                                    const barHeight = (item.count / maxCount) * 100;
-                                                    return (
-                                                        <div key={item.year} className="flex-col items-center gap-xs" style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-                                                            <div
-                                                                style={{
-                                                                    width: '100%',
-                                                                    borderRadius: '4px 4px 0 0',
-                                                                    height: `${barHeight}%`,
-                                                                    background: i === 4 ? 'var(--accent-teal)' : 'rgba(20,184,166,0.3)',
-                                                                    transition: 'height 1s ease-out',
-                                                                    minHeight: item.count > 0 ? '4px' : '0'
-                                                                }}
-                                                                title={`${item.count} Jobs Recorded`}
-                                                            />
-                                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)' }}>{item.year.slice(2)}</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
                                             <div className="flex-col gap-sm" style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
-                                                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>Top Historical Recruiters:</p>
+                                                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+                                                    {historicalTrends.total_historical_records} unique indexed results inspected
+                                                </p>
                                                 <div className="flex flex-wrap gap-xs">
-                                                    {historicalTrends.top_historical_companies.map(c => (
+                                                    {(historicalTrends.source_domains || []).map(c => (
                                                         <span key={c.name} className="badge" style={{ fontSize: '0.68rem', background: 'transparent', borderColor: 'rgba(100,130,255,0.3)' }}>{c.name} ({c.count})</span>
                                                     ))}
                                                 </div>
                                             </div>
+                                            <div className="flex-col gap-sm">
+                                                {(historicalTrends.source_records || []).slice(0, 12).map(source => (
+                                                    <a
+                                                        key={source.link}
+                                                        href={source.link}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        style={{
+                                                            display: 'block',
+                                                            padding: '0.9rem',
+                                                            border: '1px solid var(--glass-border)',
+                                                            borderRadius: '8px',
+                                                            background: 'rgba(255,255,255,0.02)',
+                                                            color: 'inherit',
+                                                            textDecoration: 'none'
+                                                        }}
+                                                    >
+                                                        <div className="flex justify-between gap-sm" style={{ alignItems: 'flex-start' }}>
+                                                            <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{source.title}</strong>
+                                                            <span style={{ fontSize: '0.64rem', color: 'var(--accent-teal)', whiteSpace: 'nowrap' }}>{source.source}</span>
+                                                        </div>
+                                                        {(source.professional_summary || source.snippet) && <p style={{ marginTop: '0.4rem', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{source.professional_summary || source.snippet}</p>}
+                                                        {source.date && <p style={{ marginTop: '0.35rem', fontSize: '0.64rem', color: 'var(--text-muted)' }}>{source.date}</p>}
+                                                    </a>
+                                                ))}
+                                            </div>
                                             <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                                                Analyzed {historicalTrends.total_historical_records} past job postings from project data artifacts.
+                                                {historicalTrends.methodology}
                                             </p>
+                                            {historicalTrends.confidence && (
+                                                <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                                    Confidence: {historicalTrends.confidence}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1118,7 +1292,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                     {codingPhase === 'results' && codingEval && (
                                                         <div className="flex-col gap-lg">
                                                             {/* Score Cards */}
-                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '0.75rem' }}>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4,1fr)', gap: '0.75rem' }}>
                                                                 {[
                                                                     { label: 'Overall', val: codingEval.overall_score, color: '#6366f1' },
                                                                     { label: 'Correctness', val: codingEval.correctness_score, color: '#059669' },
@@ -1144,7 +1318,7 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                             </div>
 
                                                             {/* Strengths/Weaknesses */}
-                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
                                                                 <div style={{ background: 'rgba(5,150,105,0.05)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(5,150,105,0.15)' }}>
                                                                     <strong style={{ color: '#34d399', fontSize: '0.8rem' }}>✅ Strengths</strong>
                                                                     <p style={{ fontSize: '0.85rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>{codingEval.strengths}</p>
@@ -1287,6 +1461,32 @@ export const InterviewCoach = ({ onComplete }: any) => {
                                                         ) : (
                                                             <div className="flex-col gap-sm" style={{ fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
                                                                 {ev.mentor_feedback && <p>{ev.mentor_feedback}</p>}
+                                                                {ev.senior_feedback && <p><strong>Senior Debrief:</strong> {ev.senior_feedback}</p>}
+                                                                {ev.answer_coverage && (
+                                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                                                        {[
+                                                                            ['Covered', ev.answer_coverage.covered || [], 'var(--accent-green)'],
+                                                                            ['Partially Covered', ev.answer_coverage.partially_covered || [], 'var(--accent-orange)'],
+                                                                            ['Missed', ev.answer_coverage.missed || [], 'var(--accent-red)']
+                                                                        ].map(([label, items, color]: any) => (
+                                                                            <div key={label} style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+                                                                                <strong style={{ color, fontSize: '0.72rem' }}>{label}</strong>
+                                                                                <div className="flex-col gap-xs" style={{ marginTop: '0.4rem' }}>
+                                                                                    {items.length ? items.map((item: string) => <span key={item}>- {item}</span>) : <span>- None noted</span>}
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                                {ev.delivery_feedback && (
+                                                                    <div style={{ background: 'rgba(56,189,248,0.05)', padding: '0.75rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-blue)', marginTop: '0.5rem' }}>
+                                                                        <strong style={{ fontSize: '0.75rem', color: 'var(--accent-blue)' }}>SPEAKING FEEDBACK:</strong>
+                                                                        {ev.delivery_feedback.speaking_summary && <p style={{ marginTop: '0.3rem' }}>{ev.delivery_feedback.speaking_summary}</p>}
+                                                                        {ev.delivery_feedback.pace && <p>Pace: {ev.delivery_feedback.pace}</p>}
+                                                                        {ev.delivery_feedback.clarity && <p>Clarity: {ev.delivery_feedback.clarity}</p>}
+                                                                        {ev.delivery_feedback.confidence && <p>Confidence: {ev.delivery_feedback.confidence}</p>}
+                                                                    </div>
+                                                                )}
                                                                 {ev.advice && <p><strong>Coach Advice:</strong> {ev.advice}</p>}
                                                                 {ev.optimal_solution && <p><strong>Optimal Approach:</strong> {ev.optimal_solution}</p>}
                                                                 {ev.strengths && ev.strengths !== 'N/A' && <p style={{ color: 'var(--accent-green)' }}><strong>✅ Strength:</strong> {ev.strengths}</p>}
