@@ -104,35 +104,31 @@ The project objective is to move beyond a prototype dashboard and build a source
 
 ## Technical Architecture
 
-```mermaid
-flowchart TD
-    Student["Student / Admin Browser"] --> Frontend["React + TypeScript + Vite"]
-    Frontend --> API["FastAPI Backend"]
-
-    API --> Auth["Auth + JWT Middleware"]
-    API --> Profiles["Profile and Progress Services"]
-    API --> Resume["Resume / PDF / DOCX / OCR Pipeline"]
-    API --> Teacher["Teacher Notes and Doubt Pipeline"]
-    API --> Interview["Interview Coach and Interview Room"]
-    API --> Coding["Coding Mentor and Error Tracking"]
-    API --> Career["Career Pathfinder and Job Matching"]
-    API --> Admin["Admin Analytics"]
-
-    Resume --> SupabaseStorage["Supabase Storage"]
-    Teacher --> SupabaseStorage
-    Interview --> VectorMemory["FAISS / Embedding Memory"]
-    Teacher --> RAG["Personal RAG Context"]
-
-    Career --> Serper["Serper Search API"]
-    Career --> DDG["DDGS / Job Sources"]
-    Interview --> Groq["Groq LLM"]
-    Career --> Groq
-    Teacher --> Groq
-    Coding --> Groq
-
-    API --> SupabaseDB["Supabase Postgres"]
-    SupabaseStorage --> SupabaseDB
-    VectorMemory --> SupabaseStorage
+```text
+Student / Admin Browser
+        |
+        v
+React + TypeScript + Vite Frontend
+        |
+        v
+FastAPI Backend
+        |
+        +-- Auth + JWT middleware
+        +-- Profile and progress services
+        +-- Resume / PDF / DOCX / OCR pipeline
+        +-- Teacher notes and doubt pipeline
+        +-- Interview Coach and Interview Room
+        +-- Coding Mentor and coding error tracking
+        +-- Career Pathfinder and job matching
+        +-- Admin analytics
+        |
+        +-- Supabase Postgres
+        +-- Supabase Storage: resumes, notes, rag-vectors
+        +-- FAISS / embedding memory
+        +-- Personal RAG context
+        +-- Groq LLM
+        +-- Serper Search API
+        +-- DDGS / public job sources
 ```
 
 ### Frontend Flow
